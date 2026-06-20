@@ -848,26 +848,21 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   function signOutOneDrive(){
     if(!pca || !msAccount) return;
+    localStorage.removeItem(STORAGE_KEY); // wipe local cache so a later login pulls fresh from cloud
     pca.logoutRedirect({ account: msAccount, postLogoutRedirectUri: msalConfig.auth.redirectUri });
   }
 
-  // On sign-in/startup: cloud is the source of truth. If no file yet, seed it from local.
+  // On login/startup OneDrive is the source of truth: load the cloud copy into local.
+  // Only when no cloud file exists yet (first run) do we seed it from whatever is local.
   async function pullFromOneDrive(){
     const token = await getToken(); if(!token) return;
     setOd('ok', null, 'Hämtar…');
     try{
       const r = await fetch(GRAPH_FILE, { headers:{ Authorization:'Bearer '+token } });
-      if(r.status === 404){ await pushToOneDrive(); return; } // first run → upload current
+      if(r.status === 404){ await pushToOneDrive(); return; } // first run → seed cloud from local
       if(!r.ok) throw new Error('GET '+r.status);
       const text = (await r.text()).trim();
-      if(text){
-        // Last-write-wins: don't let an older cloud copy clobber newer local edits.
-        let cloud=null; try{ cloud=JSON.parse(text); }catch(_){}
-        const cloudTime = cloud && cloud.lastSavedLocal ? Date.parse(cloud.lastSavedLocal) : 0;
-        const localTime = state.lastSavedLocal ? Date.parse(state.lastSavedLocal) : 0;
-        if(cloud && cloud.months && localTime > cloudTime){ await pushToOneDrive(); return; }
-        if(loadFromJson(text)) render();
-      }
+      if(text && loadFromJson(text)) render(); // cloud wins
       setOd('ok', null, 'Synkad '+timeNow());
     }catch(e){ console.warn('OneDrive-hämtning', e); setOd('warn', null, 'Synk misslyckades'); }
   }
