@@ -2,27 +2,30 @@
 <html lang="sv">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#e7eaf0" />
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0d121b" />
 <title>Familjebudget</title>
 
 <style>
 :root{
-  --bg:#f6f8fb;
-  --bg-grad:radial-gradient(1200px 600px at 100% -10%, rgba(37,99,235,.06), transparent 60%);
-  --card:#ffffff;
-  --card-2:#fbfcfe;
-  --text:#0f172a;
-  --muted:#667085;
-  --faint:#98a2b3;
-  --border:#e7eaf0;
-  --border-strong:#d7dce4;
-  --accent:#2563eb;
-  --accent-soft:#eaf0fe;
-  --success:#16a34a;
-  --success-soft:#e7f6ec;
-  --danger:#e11d48;
-  --danger-soft:#fdecef;
-  --track:#eef1f6;
+  --bg:#e7eaf0;
+  --bg-grad:radial-gradient(1100px 560px at 100% -8%, rgba(79,111,156,.06), transparent 62%);
+  --card:#f2f4f8;
+  --card-2:#e9edf3;
+  --text:#28303b;
+  --muted:#5c6675;
+  --faint:#94a0af;
+  --border:#dde2ea;
+  --border-strong:#ccd4de;
+  --accent:#4f6f9c;
+  --accent-soft:#e4eaf2;
+  --on-accent:#ffffff;
+  --success:#3d8f6a;
+  --success-soft:#e4efe9;
+  --danger:#cf5f72;
+  --danger-soft:#f7e7ea;
+  --track:#e0e5ec;
   --radius:14px;
   --radius-sm:10px;
   --gap:18px;
@@ -34,39 +37,44 @@
 }
 
 [data-theme="dark"]{
-  --bg:#0a0f1d;
-  --bg-grad:radial-gradient(1200px 600px at 100% -10%, rgba(59,130,246,.10), transparent 60%);
-  --card:#10182b;
-  --card-2:#0d1424;
-  --text:#e8eefb;
-  --muted:#94a3bd;
-  --faint:#64748b;
-  --border:#1d2740;
-  --border-strong:#283450;
-  --accent:#5b8cff;
-  --accent-soft:#16224a;
-  --success:#34d399;
-  --success-soft:#0f2a22;
-  --danger:#fb7185;
-  --danger-soft:#2a1420;
-  --track:#1a2238;
+  --bg:#0d121b;
+  --bg-grad:radial-gradient(1100px 560px at 100% -8%, rgba(91,141,239,.10), transparent 62%);
+  --card:#161d28;
+  --card-2:#121823;
+  --text:#e7ecf4;
+  --muted:#9aa7b8;
+  --faint:#677488;
+  --border:#242d3a;
+  --border-strong:#333e4e;
+  --accent:#5b8def;
+  --accent-soft:#1a2638;
+  --on-accent:#ffffff;
+  --success:#3fbd84;
+  --success-soft:#10291f;
+  --danger:#ef6f86;
+  --danger-soft:#2c1820;
+  --track:#1d2530;
   --shadow:0 1px 2px rgba(0,0,0,.3), 0 12px 30px rgba(0,0,0,.45);
   --shadow-sm:0 1px 2px rgba(0,0,0,.4);
   color-scheme:dark;
 }
 
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+html,body{min-height:100%}
 body{
   background:var(--bg);
   background-image:var(--bg-grad);
-  background-attachment:fixed;
   color:var(--text);
   -webkit-font-smoothing:antialiased;
   -moz-osx-font-smoothing:grayscale;
   padding:22px;
   line-height:1.45;
+  overflow-x:hidden;
 }
+/* Overflow-proofing: let grid/flex children shrink below their content width */
+.container,.sidebar,.main,.section,.card,.flowbar,.top-cards,.row,.item,.month-nav{min-width:0}
+.row>*,.inp{min-width:0;max-width:100%}
 
 /* ---------- Layout ---------- */
 .container{
@@ -91,9 +99,9 @@ body{
 .brand{display:flex;align-items:center;gap:12px}
 .logo{
   width:42px;height:42px;border-radius:12px;
-  background:linear-gradient(135deg,var(--accent),#8b5cf6);
+  background:linear-gradient(135deg,var(--accent),#7a6ff2);
   display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:17px;
-  box-shadow:0 4px 12px rgba(37,99,235,.35);
+  box-shadow:0 4px 12px rgba(58,109,208,.32);
 }
 .brand h1{font-size:1.06rem;font-weight:700;letter-spacing:-.01em}
 .brand .muted{font-size:.82rem}
@@ -104,33 +112,49 @@ body{
   display:flex;justify-content:space-between;align-items:center;
 }
 
-/* Month list */
-.months{display:flex;flex-direction:column;gap:4px;max-height:46vh;overflow:auto;margin:0 -6px;padding:0 6px}
-.month-item{
-  display:flex;align-items:center;justify-content:space-between;gap:8px;
-  padding:9px 11px;border-radius:var(--radius-sm);
-  border:1px solid transparent;color:var(--text);cursor:pointer;background:transparent;
-  text-align:left;width:100%;font:inherit;transition:background .12s,border-color .12s;
+/* Month rail (swipe / scroll to switch month) */
+.month-nav{
+  display:flex;align-items:center;gap:8px;
+  background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+  padding:8px;box-shadow:var(--shadow-sm);
 }
-.month-item:hover{background:var(--card-2);border-color:var(--border)}
-.month-item.active{background:var(--accent-soft);border-color:transparent;color:var(--accent);font-weight:700}
-.month-item .mi-main{display:flex;flex-direction:column;line-height:1.2;min-width:0}
-.month-item .mi-name{font-size:.95rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.month-item .mi-sub{font-size:.74rem;color:var(--muted);font-weight:500}
-.month-item.active .mi-sub{color:var(--accent);opacity:.8}
-.month-item .mi-bal{font-size:.8rem;font-weight:700;white-space:nowrap}
-.mi-del{
-  opacity:0;border:none;background:transparent;color:var(--faint);cursor:pointer;
-  padding:2px 4px;border-radius:6px;font-size:15px;line-height:1;flex:none;
+.mn-arrow{
+  flex:none;width:36px;height:36px;border-radius:10px;border:1px solid var(--border);
+  background:var(--card-2);color:var(--muted);cursor:pointer;font-size:20px;line-height:1;
+  display:flex;align-items:center;justify-content:center;transition:background .12s,color .12s;
 }
-.month-item:hover .mi-del{opacity:1}
-.mi-del:hover{background:var(--danger-soft);color:var(--danger)}
+.mn-arrow:hover{background:var(--accent-soft);color:var(--accent)}
+.mn-arrow:disabled{opacity:.35;cursor:default;background:var(--card-2);color:var(--faint)}
+.month-rail{
+  flex:1;display:flex;gap:8px;overflow-x:auto;scroll-behavior:smooth;
+  scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;padding:2px;scrollbar-width:none;
+}
+.month-rail::-webkit-scrollbar{display:none}
+.mchip{
+  position:relative;flex:0 0 auto;scroll-snap-align:center;min-width:118px;
+  display:flex;flex-direction:column;gap:1px;text-align:left;
+  padding:8px 12px;border-radius:var(--radius-sm);border:1px solid var(--border);
+  background:var(--card-2);color:var(--text);cursor:pointer;font:inherit;transition:all .14s;
+}
+.mchip:hover{border-color:var(--border-strong)}
+.mchip.active{background:var(--accent-soft);border-color:transparent;box-shadow:inset 0 0 0 1.5px var(--accent)}
+.mc-name{font-size:.9rem;font-weight:700;white-space:nowrap}
+.mchip.active .mc-name{color:var(--accent)}
+.mc-bal{font-size:.76rem;font-weight:600;white-space:nowrap}
+.mchip.add{align-items:center;justify-content:center;color:var(--muted);font-size:1.2rem;font-weight:700;min-width:46px}
+.mc-del{
+  position:absolute;top:-7px;right:-7px;width:20px;height:20px;border-radius:50%;
+  border:1px solid var(--border);background:var(--card);color:var(--faint);cursor:pointer;
+  font-size:13px;line-height:1;display:none;align-items:center;justify-content:center;
+}
+.mchip.active .mc-del{display:flex}
+.mc-del:hover{background:var(--danger-soft);color:var(--danger);border-color:transparent}
 
 /* Buttons */
 .btn{
   display:inline-flex;align-items:center;justify-content:center;gap:7px;
   padding:10px 13px;border-radius:var(--radius-sm);border:1px solid transparent;
-  background:var(--accent);color:#fff;cursor:pointer;font-weight:600;font-size:.92rem;
+  background:var(--accent);color:var(--on-accent);cursor:pointer;font-weight:600;font-size:.92rem;
   transition:filter .12s,background .12s,border-color .12s;white-space:nowrap;
 }
 .btn:hover{filter:brightness(1.05)}
@@ -184,7 +208,7 @@ body{
 .flowbar .fb-head{display:flex;justify-content:space-between;font-size:.82rem;color:var(--muted);margin-bottom:9px}
 .flowbar .fb-head b{color:var(--text);font-variant-numeric:tabular-nums}
 .track{height:12px;border-radius:999px;background:var(--track);overflow:hidden;position:relative}
-.track .fill{height:100%;border-radius:999px;transition:width .35s ease;background:linear-gradient(90deg,var(--accent),#8b5cf6)}
+.track .fill{height:100%;border-radius:999px;transition:width .35s ease;background:linear-gradient(90deg,var(--accent),#7a6ff2)}
 .track .fill.over{background:linear-gradient(90deg,#f59e0b,var(--danger))}
 .flowbar .fb-foot{display:flex;justify-content:space-between;font-size:.78rem;color:var(--faint);margin-top:7px}
 
@@ -200,14 +224,14 @@ body{
 /* Rows */
 .rows{display:flex;flex-direction:column}
 .col-head{
-  display:grid;grid-template-columns:1fr 132px 64px 34px;gap:10px;align-items:center;
+  display:grid;grid-template-columns:1fr 132px 34px;gap:10px;align-items:center;
   padding:6px 4px;font-size:.72rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--faint);
 }
 .col-head .ch-amt{text-align:right;padding-right:4px}
-.col-head .ch-fixed,.col-head .ch-del{text-align:center}
+.col-head .ch-del{text-align:center}
 .item{padding:5px 0;border-top:1px solid var(--border)}
 .item:first-child{border-top:none}
-.row{display:grid;grid-template-columns:1fr 132px 64px 34px;gap:10px;align-items:center}
+.row{display:grid;grid-template-columns:1fr 132px 34px;gap:10px;align-items:center}
 .inp{
   width:100%;padding:9px 11px;border-radius:var(--radius-sm);border:1px solid transparent;
   background:transparent;color:var(--text);font:inherit;transition:border-color .12s,background .12s;
@@ -218,18 +242,18 @@ body{
 .amt-wrap{position:relative}
 .inp.amt{text-align:right;padding-right:30px;font-variant-numeric:tabular-nums}
 .amt-wrap .kr{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:.78rem;color:var(--faint);pointer-events:none}
-.fixed-toggle{display:flex;justify-content:center}
-.fixed-toggle input{width:16px;height:16px;accent-color:var(--accent);cursor:pointer}
 .row-del{
   border:none;background:transparent;color:var(--faint);cursor:pointer;
   border-radius:8px;padding:6px;font-size:16px;line-height:1;
 }
 .row-del:hover{background:var(--danger-soft);color:var(--danger)}
 
-/* per-expense bar */
-.item-bar{height:5px;border-radius:999px;background:var(--track);margin:4px 4px 2px;overflow:hidden}
-.item-bar .ib-fill{height:100%;border-radius:999px;background:var(--accent);opacity:.55;transition:width .3s}
-.item-bar .ib-fill.big{opacity:.8}
+/* per-expense bar — share of total expenses */
+.item-bar{display:flex;align-items:center;gap:8px;margin:5px 4px 2px}
+.ib-track{flex:1;height:5px;border-radius:999px;background:var(--track);overflow:hidden}
+.ib-fill{height:100%;border-radius:999px;background:var(--accent);opacity:.5;transition:width .3s}
+.ib-fill.big{opacity:.85}
+.ib-pct{font-size:.72rem;color:var(--faint);min-width:34px;text-align:right;font-variant-numeric:tabular-nums}
 
 .empty{padding:14px 6px;color:var(--faint);font-size:.9rem}
 .add-row{padding:6px 0 10px}
@@ -269,20 +293,13 @@ dialog::backdrop{background:rgba(10,15,29,.45);backdrop-filter:blur(2px)}
 @media (max-width:920px){
   .container{grid-template-columns:1fr}
   .sidebar{position:static;top:auto}
-  .months{flex-direction:row;max-height:none;overflow:auto;padding-bottom:4px}
-  .month-item{min-width:150px}
-  .mi-del{opacity:1}
 }
 @media (max-width:560px){
   body{padding:12px}
   .top-cards{grid-template-columns:1fr}
   .col-head{display:none}
-  .row{grid-template-columns:1fr 110px 30px;grid-template-areas:"name amt del" "fixed fixed fixed"}
-  .row .inp.name{grid-area:name}
-  .row .amt-wrap{grid-area:amt}
-  .row .fixed-toggle{grid-area:fixed;justify-content:flex-start;gap:8px}
-  .row .fixed-toggle::after{content:"Fast post";font-size:.82rem;color:var(--muted)}
-  .row .row-del{grid-area:del}
+  .row{grid-template-columns:1fr 104px 30px;gap:8px}
+  .mchip{min-width:130px}
 }
 </style>
 </head>
@@ -302,11 +319,6 @@ dialog::backdrop{background:rgba(10,15,29,.45);backdrop-filter:blur(2px)}
 
     <div class="side-section">
       <button class="btn block" id="newMonthBtn" type="button">+ Ny månad</button>
-    </div>
-
-    <div class="side-section">
-      <div class="side-label"><span>Månader</span></div>
-      <nav class="months" id="monthList" aria-label="Lista över månader"></nav>
     </div>
 
     <div class="side-section">
@@ -330,6 +342,12 @@ dialog::backdrop{background:rgba(10,15,29,.45);backdrop-filter:blur(2px)}
 
   <!-- Main -->
   <main class="main" role="main">
+    <nav class="month-nav" aria-label="Välj månad">
+      <button class="mn-arrow" id="prevMonth" type="button" aria-label="Föregående månad">‹</button>
+      <div class="month-rail" id="monthRail"></div>
+      <button class="mn-arrow" id="nextMonth" type="button" aria-label="Nästa månad">›</button>
+    </nav>
+
     <div class="page-head">
       <div>
         <h2 id="monthTitle">—</h2>
@@ -370,7 +388,7 @@ dialog::backdrop{background:rgba(10,15,29,.45);backdrop-filter:blur(2px)}
         <h2 id="incomeHeading">Intäkter</h2>
         <span class="total" id="incomeHeadTotal">0 kr</span>
       </div>
-      <div class="col-head"><span>Namn</span><span class="ch-amt">Belopp</span><span class="ch-fixed">Fast</span><span class="ch-del"></span></div>
+      <div class="col-head"><span>Namn</span><span class="ch-amt">Belopp</span><span class="ch-del"></span></div>
       <div class="rows" id="incomeRows"></div>
       <div class="add-row"><button class="btn ghost sm" id="addIncomeBtn" type="button">+ Lägg till intäkt</button></div>
     </section>
@@ -380,7 +398,7 @@ dialog::backdrop{background:rgba(10,15,29,.45);backdrop-filter:blur(2px)}
         <h2 id="expenseHeading">Utgifter</h2>
         <span class="total" id="expenseHeadTotal">0 kr</span>
       </div>
-      <div class="col-head"><span>Namn</span><span class="ch-amt">Belopp</span><span class="ch-fixed">Fast</span><span class="ch-del"></span></div>
+      <div class="col-head"><span>Namn</span><span class="ch-amt">Belopp</span><span class="ch-del"></span></div>
       <div class="rows" id="expenseRows"></div>
       <div class="add-row"><button class="btn ghost sm" id="addExpenseBtn" type="button">+ Lägg till utgift</button></div>
     </section>
@@ -483,25 +501,57 @@ document.addEventListener('DOMContentLoaded', () => {
   function monthBalance(key){ const m=state.months[key]; return m ? sum(m.income)-sum(m.expenses) : 0; }
 
   /* ---------------- Render ---------------- */
-  function render(){ applyTheme(); renderMonths(); renderHead(); renderRows(); renderTotals(); }
+  function render(){ applyTheme(); renderMonthRail(); renderHead(); renderRows(); renderTotals(); }
 
-  function renderMonths(){
-    const c = $('monthList'); c.innerHTML = '';
-    Object.keys(state.months).sort().reverse().forEach(k => {
-      const btn = document.createElement('button');
-      btn.className = 'month-item' + (k===state.currentMonth ? ' active' : '');
-      btn.type = 'button';
+  function sortedKeys(){ return Object.keys(state.months).sort(); } // chronological (oldest → newest)
+
+  function renderMonthRail(){
+    const rail = $('monthRail'); rail.innerHTML = '';
+    const keys = sortedKeys();
+    let activeChip = null;
+
+    keys.forEach(k => {
+      const chip = document.createElement('button');
+      chip.className = 'mchip' + (k===state.currentMonth ? ' active' : '');
+      chip.type = 'button';
       const bal = monthBalance(k);
-      btn.innerHTML =
-        `<span class="mi-main"><span class="mi-name">${monthLabel(k)}</span><span class="mi-sub">${k}</span></span>`+
-        `<span class="mi-bal ${bal<0?'neg':'pos'}">${formatMoney(bal)}</span>`;
-      btn.addEventListener('click', ()=>{ state.currentMonth=k; saveDebounced(); render(); });
-      const del = document.createElement('button');
-      del.className = 'mi-del'; del.type='button'; del.title='Ta bort månad'; del.textContent='×';
-      del.addEventListener('click', (e)=>{ e.stopPropagation(); deleteMonth(k); });
-      btn.appendChild(del);
-      c.appendChild(btn);
+      chip.innerHTML =
+        `<span class="mc-name">${monthLabel(k)}</span>`+
+        `<span class="mc-bal ${bal<0?'neg':'pos'}">${formatMoney(bal)}</span>`;
+      chip.addEventListener('click', ()=>{ state.currentMonth=k; saveDebounced(); render(); });
+      if(k===state.currentMonth){
+        const del = document.createElement('span');
+        del.className='mc-del'; del.title='Ta bort månad'; del.textContent='×';
+        del.setAttribute('role','button');
+        del.addEventListener('click', (e)=>{ e.stopPropagation(); deleteMonth(k); });
+        chip.appendChild(del);
+        activeChip = chip;
+      }
+      rail.appendChild(chip);
     });
+
+    // trailing "+" chip to add a month
+    const add = document.createElement('button');
+    add.className='mchip add'; add.type='button'; add.title='Ny månad'; add.textContent='+';
+    add.addEventListener('click', newMonth);
+    rail.appendChild(add);
+
+    // arrows enabled only when there's somewhere to go
+    const idx = keys.indexOf(state.currentMonth);
+    $('prevMonth').disabled = idx <= 0;
+    $('nextMonth').disabled = idx === -1 || idx >= keys.length-1;
+
+    // bring the active month into view
+    if(activeChip) activeChip.scrollIntoView({inline:'center', block:'nearest'});
+  }
+
+  function stepMonth(dir){
+    const keys = sortedKeys();
+    const idx = keys.indexOf(state.currentMonth);
+    const next = idx + dir;
+    if(next < 0 || next >= keys.length) return;
+    state.currentMonth = keys[next];
+    saveDebounced(); render();
   }
 
   function renderHead(){
@@ -513,22 +563,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderRows(){
     const m = currentMonth();
-    const maxExp = Math.max(0, ...m.expenses.map(i=>Number(i.amount)||0));
+    const totalExp = sum(m.expenses);
     fillSection('incomeRows', m.income, 'income', 0);
-    fillSection('expenseRows', m.expenses, 'expense', maxExp);
+    fillSection('expenseRows', m.expenses, 'expense', totalExp);
   }
 
-  function fillSection(containerId, list, type, maxExp){
+  function fillSection(containerId, list, type, totalExp){
     const c = $(containerId); c.innerHTML = '';
     if(!list.length){
       const e = document.createElement('div'); e.className='empty';
       e.textContent = type==='income' ? 'Inga intäkter ännu.' : 'Inga utgifter ännu.';
       c.appendChild(e); return;
     }
-    list.forEach((item, idx)=> c.appendChild(createRow(type, item, idx, maxExp)));
+    list.forEach((item, idx)=> c.appendChild(createRow(type, item, idx, totalExp)));
   }
 
-  function createRow(type, item, idx, maxExp){
+  // Set an expense bar to its share of the month's total expenses.
+  function setBar(fill, label, val, total){
+    const pct = total>0 ? (val/total*100) : 0;
+    fill.style.width = pct.toFixed(1)+'%';
+    fill.classList.toggle('big', pct>=33);
+    label.textContent = Math.round(pct)+'%';
+  }
+
+  function createRow(type, item, idx, totalExp){
     const wrap = document.createElement('div'); wrap.className='item';
     const row = document.createElement('div'); row.className='row';
 
@@ -546,12 +604,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const kr = document.createElement('span'); kr.className='kr'; kr.textContent='kr';
     amtWrap.appendChild(amt); amtWrap.appendChild(kr);
 
-    const fixedWrap = document.createElement('label'); fixedWrap.className='fixed-toggle'; fixedWrap.title='Fast post';
-    const fixed = document.createElement('input'); fixed.type='checkbox'; fixed.checked=!!item.fixed;
-    fixed.setAttribute('aria-label','Fast post');
-    fixed.addEventListener('change', e=>{ item.fixed=e.target.checked; saveDebounced(); });
-    fixedWrap.appendChild(fixed);
-
     const del = document.createElement('button');
     del.className='row-del'; del.type='button'; del.title='Ta bort'; del.textContent='×';
     del.addEventListener('click', ()=>{
@@ -560,32 +612,29 @@ document.addEventListener('DOMContentLoaded', () => {
       saveDebounced(); render();
     });
 
-    row.append(name, amtWrap, fixedWrap, del);
+    row.append(name, amtWrap, del);
     wrap.appendChild(row);
 
     if(type==='expense'){
       const bar = document.createElement('div'); bar.className='item-bar';
+      const track = document.createElement('div'); track.className='ib-track';
       const fill = document.createElement('div'); fill.className='ib-fill';
-      const val = Number(item.amount)||0;
-      const pct = maxExp>0 ? (val/maxExp*100) : 0;
-      fill.style.width = pct.toFixed(1)+'%';
-      if(pct>66) fill.classList.add('big');
-      bar.appendChild(fill); wrap.appendChild(bar);
-      wrap._barFill = fill; wrap._item = item;
+      track.appendChild(fill);
+      const pctLabel = document.createElement('span'); pctLabel.className='ib-pct';
+      bar.append(track, pctLabel);
+      wrap.appendChild(bar);
+      wrap._barFill = fill; wrap._barPct = pctLabel; wrap._item = item;
+      setBar(fill, pctLabel, Number(item.amount)||0, totalExp);
     }
     return wrap;
   }
 
   // Lightweight bar refresh without full re-render (during typing)
   function updateBars(){
-    const m = currentMonth();
-    const maxExp = Math.max(0, ...m.expenses.map(i=>Number(i.amount)||0));
+    const total = sum(currentMonth().expenses);
     $('expenseRows').querySelectorAll('.item').forEach(el=>{
-      if(!el._barFill || !el._item) return;
-      const val = Number(el._item.amount)||0;
-      const pct = maxExp>0 ? (val/maxExp*100) : 0;
-      el._barFill.style.width = pct.toFixed(1)+'%';
-      el._barFill.classList.toggle('big', pct>66);
+      if(!el._barFill || !el._barPct || !el._item) return;
+      setBar(el._barFill, el._barPct, Number(el._item.amount)||0, total);
     });
   }
 
@@ -620,8 +669,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   /* ---------------- Actions ---------------- */
-  function addIncome(){ currentMonth().income.push({name:'',amount:0,fixed:false}); saveDebounced(); render(); focusLastName('incomeRows'); }
-  function addExpense(){ currentMonth().expenses.push({name:'',amount:0,fixed:false}); saveDebounced(); render(); focusLastName('expenseRows'); }
+  function addIncome(){ currentMonth().income.push({name:'',amount:0}); saveDebounced(); render(); focusLastName('incomeRows'); }
+  function addExpense(){ currentMonth().expenses.push({name:'',amount:0}); saveDebounced(); render(); focusLastName('expenseRows'); }
   function focusLastName(id){ const rows=$(id).querySelectorAll('.inp.name'); if(rows.length) rows[rows.length-1].focus(); }
 
   function newMonth(){
@@ -817,6 +866,8 @@ document.addEventListener('DOMContentLoaded', () => {
   $('addIncomeBtn').addEventListener('click', addIncome);
   $('addExpenseBtn').addEventListener('click', addExpense);
   $('newMonthBtn').addEventListener('click', newMonth);
+  $('prevMonth').addEventListener('click', ()=>stepMonth(-1));
+  $('nextMonth').addEventListener('click', ()=>stepMonth(1));
   $('toggleThemeBtn').addEventListener('click', toggleTheme);
   $('connectBtn').onclick = connectFile;
   $('exportBtn').addEventListener('click', exportFile);
