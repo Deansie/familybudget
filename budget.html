@@ -224,14 +224,21 @@ body{
 /* Rows */
 .rows{display:flex;flex-direction:column}
 .col-head{
-  display:grid;grid-template-columns:1fr 132px 34px;gap:10px;align-items:center;
+  display:grid;grid-template-columns:22px 1fr 132px 34px;gap:10px;align-items:center;
   padding:6px 4px;font-size:.72rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--faint);
 }
 .col-head .ch-amt{text-align:right;padding-right:4px}
 .col-head .ch-del{text-align:center}
-.item{padding:5px 0;border-top:1px solid var(--border)}
+.item{padding:5px 0;border-top:1px solid var(--border);border-radius:8px}
 .item:first-child{border-top:none}
-.row{display:grid;grid-template-columns:1fr 132px 34px;gap:10px;align-items:center}
+.item.dragging{opacity:.95;background:var(--card-2);box-shadow:var(--shadow);border-top-color:transparent;cursor:grabbing}
+.row{display:grid;grid-template-columns:22px 1fr 132px 34px;gap:10px;align-items:center}
+.drag-handle{
+  display:flex;align-items:center;justify-content:center;cursor:grab;touch-action:none;
+  color:var(--faint);font-size:15px;line-height:1;user-select:none;border-radius:6px;height:34px;
+}
+.drag-handle:hover{color:var(--muted);background:var(--card-2)}
+.drag-handle:active{cursor:grabbing}
 .inp{
   width:100%;padding:9px 11px;border-radius:var(--radius-sm);border:1px solid transparent;
   background:transparent;color:var(--text);font:inherit;transition:border-color .12s,background .12s;
@@ -298,7 +305,7 @@ dialog::backdrop{background:rgba(10,15,29,.45);backdrop-filter:blur(2px)}
   body{padding:12px}
   .top-cards{grid-template-columns:1fr}
   .col-head{display:none}
-  .row{grid-template-columns:1fr 104px 30px;gap:8px}
+  .row{grid-template-columns:20px 1fr 96px 30px;gap:7px}
   .mchip{min-width:130px}
 }
 </style>
@@ -375,7 +382,7 @@ dialog::backdrop{background:rgba(10,15,29,.45);backdrop-filter:blur(2px)}
         <h2 id="incomeHeading">Intäkter</h2>
         <span class="total" id="incomeHeadTotal">0 kr</span>
       </div>
-      <div class="col-head"><span>Namn</span><span class="ch-amt">Belopp</span><span class="ch-del"></span></div>
+      <div class="col-head"><span></span><span>Namn</span><span class="ch-amt">Belopp</span><span class="ch-del"></span></div>
       <div class="rows" id="incomeRows"></div>
       <div class="add-row"><button class="btn ghost sm" id="addIncomeBtn" type="button">+ Lägg till intäkt</button></div>
     </section>
@@ -385,7 +392,7 @@ dialog::backdrop{background:rgba(10,15,29,.45);backdrop-filter:blur(2px)}
         <h2 id="expenseHeading">Utgifter</h2>
         <span class="total" id="expenseHeadTotal">0 kr</span>
       </div>
-      <div class="col-head"><span>Namn</span><span class="ch-amt">Belopp</span><span class="ch-del"></span></div>
+      <div class="col-head"><span></span><span>Namn</span><span class="ch-amt">Belopp</span><span class="ch-del"></span></div>
       <div class="rows" id="expenseRows"></div>
       <div class="add-row"><button class="btn ghost sm" id="addExpenseBtn" type="button">+ Lägg till utgift</button></div>
     </section>
@@ -521,8 +528,16 @@ document.addEventListener('DOMContentLoaded', () => {
     $('prevMonth').disabled = idx <= 0;
     $('nextMonth').disabled = idx === -1 || idx >= keys.length-1;
 
-    // bring the active month into view
-    if(activeChip) activeChip.scrollIntoView({inline:'center', block:'nearest'});
+    // Center the active chip within the rail by adjusting the rail's OWN horizontal
+    // scroll only — scrollIntoView() would also scroll the whole page up to the rail
+    // (jumping away from a row you just added).
+    if(activeChip){
+      const railRect = rail.getBoundingClientRect();
+      const chipRect = activeChip.getBoundingClientRect();
+      const current = chipRect.left - railRect.left;          // chip offset inside the rail now
+      const target  = (rail.clientWidth - activeChip.offsetWidth) / 2;
+      rail.scrollLeft += current - target;
+    }
   }
 
   function stepMonth(dir){
@@ -568,7 +583,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function createRow(type, item, idx, totalExp){
     const wrap = document.createElement('div'); wrap.className='item';
+    wrap._item = item; wrap._type = type;
     const row = document.createElement('div'); row.className='row';
+
+    const handle = document.createElement('div');
+    handle.className='drag-handle'; handle.textContent='⠿'; handle.title='Dra för att flytta';
+    handle.setAttribute('aria-label','Flytta rad');
+    attachDrag(handle, wrap, type);
 
     const name = document.createElement('input');
     name.className='inp name'; name.placeholder='Namn'; name.value=item.name||'';
@@ -587,12 +608,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const del = document.createElement('button');
     del.className='row-del'; del.type='button'; del.title='Ta bort'; del.textContent='×';
     del.addEventListener('click', ()=>{
-      const m = currentMonth();
-      (type==='income'?m.income:m.expenses).splice(idx,1);
+      const arr = type==='income' ? currentMonth().income : currentMonth().expenses;
+      const i = arr.indexOf(item); if(i>-1) arr.splice(i,1);
       saveDebounced(); render();
     });
 
-    row.append(name, amtWrap, del);
+    row.append(handle, name, amtWrap, del);
     wrap.appendChild(row);
 
     if(type==='expense'){
@@ -603,10 +624,50 @@ document.addEventListener('DOMContentLoaded', () => {
       const pctLabel = document.createElement('span'); pctLabel.className='ib-pct';
       bar.append(track, pctLabel);
       wrap.appendChild(bar);
-      wrap._barFill = fill; wrap._barPct = pctLabel; wrap._item = item;
+      wrap._barFill = fill; wrap._barPct = pctLabel;
       setBar(fill, pctLabel, Number(item.amount)||0, totalExp);
     }
     return wrap;
+  }
+
+  // Drag-to-reorder via pointer events (works with mouse and touch/iOS).
+  function attachDrag(handle, wrap, type){
+    handle.addEventListener('pointerdown', (e)=>{
+      e.preventDefault();
+      const container = wrap.parentElement;
+      try{ handle.setPointerCapture(e.pointerId); }catch(_){}
+      wrap.classList.add('dragging');
+
+      const move = (ev)=>{
+        const y = ev.clientY;
+        const others = Array.from(container.querySelectorAll('.item')).filter(n=>n!==wrap);
+        let placed = false;
+        for(const sib of others){
+          const r = sib.getBoundingClientRect();
+          if(y < r.top + r.height/2){ container.insertBefore(wrap, sib); placed = true; break; }
+        }
+        if(!placed) container.appendChild(wrap);
+      };
+      const up = (ev)=>{
+        try{ handle.releasePointerCapture(ev.pointerId); }catch(_){}
+        handle.removeEventListener('pointermove', move);
+        handle.removeEventListener('pointerup', up);
+        handle.removeEventListener('pointercancel', up);
+        wrap.classList.remove('dragging');
+        commitOrder(type, container);
+      };
+      handle.addEventListener('pointermove', move);
+      handle.addEventListener('pointerup', up);
+      handle.addEventListener('pointercancel', up);
+    });
+  }
+
+  // Rebuild the data array to match the new DOM order, then re-render.
+  function commitOrder(type, container){
+    const m = currentMonth();
+    const newArr = Array.from(container.querySelectorAll('.item')).map(n=>n._item).filter(Boolean);
+    if(type==='income') m.income = newArr; else m.expenses = newArr;
+    saveDebounced(); render();
   }
 
   // Lightweight bar refresh without full re-render (during typing)
