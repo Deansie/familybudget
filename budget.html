@@ -787,7 +787,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // On startup, try to silently re-use a previously connected file.
   async function restoreFile(){
-    if(!window.showOpenFilePicker) { setStorageStatus('', 'Lokalt (denna webbläsare)', 'Filkoppling stöds ej i denna webbläsare'); return; }
+    if(!window.showOpenFilePicker) { setStorageStatus('ok', 'Lokal lagring (iPhone/Safari)', 'Autokoppling finns bara på dator. Synka med OneDrive via <b>Importera/Exportera</b> nedan.'); return; }
     try{
       const handle = await idbGet();
       if(!handle) { setStorageStatus('', 'Inte kopplad'); return; }
@@ -834,8 +834,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Manual export — works in every browser (incl. iOS). Download budget.json,
   // then save it back to OneDrive via the share sheet / Save dialog.
-  function exportFile(){
-    const blob = new Blob([JSON.stringify(state,null,2)], {type:'application/json'});
+  async function exportFile(){
+    const data = JSON.stringify(state,null,2);
+    // Mobile (iOS/Android): open the native share sheet so the file can go
+    // straight to OneDrive / "Spara i Filer" instead of the Downloads folder.
+    try{
+      const file = new File([data], 'budget.json', {type:'application/json'});
+      if(navigator.canShare && navigator.canShare({files:[file]})){
+        await navigator.share({files:[file], title:'budget.json'});
+        toast('ok','Delad – välj OneDrive eller Spara i Filer');
+        return;
+      }
+    }catch(e){
+      if(e && e.name==='AbortError') return; // user cancelled the share sheet
+      console.warn('Web Share ej tillgänglig, laddar ner istället', e);
+    }
+    // Desktop fallback: regular download.
+    const blob = new Blob([data], {type:'application/json'});
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href=url; a.download='budget.json';
     document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
