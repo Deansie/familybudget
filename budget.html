@@ -322,7 +322,16 @@ dialog::backdrop{background:rgba(10,15,29,.45);backdrop-filter:blur(2px)}
     </div>
 
     <div class="side-section">
-      <div class="side-label"><span>Lagring</span></div>
+      <div class="side-label"><span>OneDrive</span></div>
+      <div class="storage">
+        <div class="st-row"><span class="dot" id="odDot"></span><span class="st-name" id="odName">Inte inloggad</span></div>
+        <div id="odHint" style="font-size:.76rem">Logga in för automatisk synk på alla enheter.</div>
+        <button class="btn ghost sm block" id="onedriveBtn" type="button">☁ Logga in med OneDrive</button>
+      </div>
+    </div>
+
+    <div class="side-section">
+      <div class="side-label"><span>Lokal fil / säkerhetskopia</span></div>
       <div class="storage">
         <div class="st-row"><span class="dot" id="storeDot"></span><span class="st-name" id="storeName">Inte kopplad</span></div>
         <div id="storeHint" style="font-size:.76rem">Koppla din <b>budget.json</b> så sparas allt automatiskt.</div>
@@ -436,6 +445,9 @@ dialog::backdrop{background:rgba(10,15,29,.45);backdrop-filter:blur(2px)}
   </form>
 </dialog>
 
+<!-- Microsoft auth library (for OneDrive sync). Degrades gracefully if it can't load. -->
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.27.0/lib/msal-browser.min.js"></script>
+
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   'use strict';
@@ -444,6 +456,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let state = loadLocal();
   let fileHandle = null;          // FileSystemFileHandle when connected
+  let pca = null, msAccount = null; // MSAL instance + signed-in OneDrive account
   const saveDebounced = debounce(saveAll, 600);
 
   /* ---------------- State ---------------- */
@@ -465,7 +478,7 @@ document.addEventListener('DOMContentLoaded', () => {
     catch(e){ console.error('Lokal sparning misslyckades', e); }
   }
 
-  // Save to localStorage always, and to the connected file if available.
+  // Save to localStorage always, plus the connected file and/or OneDrive if available.
   async function saveAll(){
     state.lastSavedLocal = new Date().toISOString();
     persistLocal();
@@ -480,6 +493,7 @@ document.addEventListener('DOMContentLoaded', () => {
         setStorageStatus('warn', fileHandle.name, 'Kunde inte spara till filen');
       }
     }
+    if(pca && msAccount) pushToOneDrive(); // fire-and-forget cloud sync
   }
 
   function debounce(fn, wait){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),wait); }; }
@@ -827,6 +841,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ? obj.currentMonth : Object.keys(obj.months).sort().reverse()[0];
       if(obj.theme) state.theme = obj.theme;
       if(obj._meta) state._meta = obj._meta;
+      if(obj.lastSavedLocal) state.lastSavedLocal = obj.lastSavedLocal;
       persistLocal();
       return true;
     }catch(e){ toast('warn','Kunde inte läsa filen'); return false; }
@@ -868,6 +883,103 @@ document.addEventListener('DOMContentLoaded', () => {
     reader.readAsText(f);
   }
 
+  /* ---------------- OneDrive sync (Microsoft Graph + MSAL) ---------------- */
+  const MS_SCOPES = ['Files.ReadWrite.AppFolder'];
+  // Reads/writes a single budget.json inside the app's own OneDrive folder
+  // (Apps/Familjebudget) — the AppFolder scope can't touch anything else.
+  const GRAPH_FILE = 'https://graph.microsoft.com/v1.0/me/drive/special/approot:/budget.json:/content';
+  const msalConfig = {
+    auth: {
+      clientId: '31fc0f4f-3641-4644-bddd-252c6ef7e804',
+      authority: 'https://login.microsoftonline.com/consumers', // personal Microsoft accounts
+      redirectUri: location.origin + location.pathname
+    },
+    cache: { cacheLocation: 'localStorage' } // survive reloads so iOS doesn't re-login constantly
+  };
+
+  function setOd(level, name, hint){
+    $('odDot').className = 'dot' + (level==='ok'?' ok':level==='warn'?' warn':'');
+    if(name!=null) $('odName').textContent = name;
+    if(hint!=null) $('odHint').innerHTML = hint;
+  }
+  function odSignedIn(){
+    setOd('ok', msAccount.username || 'Inloggad', 'Synkas automatiskt');
+    const b=$('onedriveBtn'); b.textContent='Logga ut'; b.onclick=signOutOneDrive;
+  }
+  function odSignedOut(){
+    setOd('', 'Inte inloggad', 'Logga in för automatisk synk på alla enheter.');
+    const b=$('onedriveBtn'); b.textContent='☁ Logga in med OneDrive'; b.onclick=signInOneDrive;
+  }
+
+  async function initOneDrive(){
+    if(typeof msal === 'undefined'){ setOd('warn','OneDrive', 'Kunde inte ladda inloggningsbiblioteket (offline?)'); return; }
+    try{
+      pca = new msal.PublicClientApplication(msalConfig);
+      await pca.initialize();
+      const res = await pca.handleRedirectPromise();
+      if(res && res.account) msAccount = res.account;
+      if(!msAccount){ const a = pca.getAllAccounts(); if(a.length) msAccount = a[0]; }
+    }catch(e){ console.warn('MSAL init', e); setOd('warn','OneDrive','Inloggning misslyckades'); return; }
+
+    if(msAccount){ odSignedIn(); await pullFromOneDrive(); }
+    else odSignedOut();
+  }
+
+  async function getToken(){
+    if(!pca || !msAccount) return null;
+    try{
+      const r = await pca.acquireTokenSilent({ scopes: MS_SCOPES, account: msAccount });
+      return r.accessToken;
+    }catch(e){
+      console.warn('Tyst token misslyckades, omdirigerar', e);
+      await pca.acquireTokenRedirect({ scopes: MS_SCOPES, account: msAccount });
+      return null;
+    }
+  }
+
+  function signInOneDrive(){
+    if(!pca){ toast('warn','OneDrive ej redo'); return; }
+    pca.loginRedirect({ scopes: MS_SCOPES });
+  }
+  function signOutOneDrive(){
+    if(!pca || !msAccount) return;
+    pca.logoutRedirect({ account: msAccount, postLogoutRedirectUri: msalConfig.auth.redirectUri });
+  }
+
+  // On sign-in/startup: cloud is the source of truth. If no file yet, seed it from local.
+  async function pullFromOneDrive(){
+    const token = await getToken(); if(!token) return;
+    setOd('ok', null, 'Hämtar…');
+    try{
+      const r = await fetch(GRAPH_FILE, { headers:{ Authorization:'Bearer '+token } });
+      if(r.status === 404){ await pushToOneDrive(); return; } // first run → upload current
+      if(!r.ok) throw new Error('GET '+r.status);
+      const text = (await r.text()).trim();
+      if(text){
+        // Last-write-wins: don't let an older cloud copy clobber newer local edits.
+        let cloud=null; try{ cloud=JSON.parse(text); }catch(_){}
+        const cloudTime = cloud && cloud.lastSavedLocal ? Date.parse(cloud.lastSavedLocal) : 0;
+        const localTime = state.lastSavedLocal ? Date.parse(state.lastSavedLocal) : 0;
+        if(cloud && cloud.months && localTime > cloudTime){ await pushToOneDrive(); return; }
+        if(loadFromJson(text)) render();
+      }
+      setOd('ok', null, 'Synkad '+timeNow());
+    }catch(e){ console.warn('OneDrive-hämtning', e); setOd('warn', null, 'Synk misslyckades'); }
+  }
+
+  async function pushToOneDrive(){
+    const token = await getToken(); if(!token) return;
+    try{
+      const r = await fetch(GRAPH_FILE, {
+        method:'PUT',
+        headers:{ Authorization:'Bearer '+token, 'Content-Type':'application/json' },
+        body: JSON.stringify(state, null, 2)
+      });
+      if(!r.ok) throw new Error('PUT '+r.status);
+      setOd('ok', null, 'Synkad '+timeNow());
+    }catch(e){ console.warn('OneDrive-sparning', e); setOd('warn', null, 'Kunde inte synka'); }
+  }
+
   /* ---------------- Toast ---------------- */
   function toast(level, msg){
     const t = document.createElement('div'); t.className='toast';
@@ -888,6 +1000,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('exportBtn').addEventListener('click', exportFile);
   $('importBtn').addEventListener('click', importFile);
   $('importInput').addEventListener('change', onImportPicked);
+  $('onedriveBtn').onclick = signInOneDrive;
 
   // Auto-save to a connected file only exists where the File System Access API does.
   if(window.showOpenFilePicker) $('connectBtn').style.display = '';
@@ -899,6 +1012,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   render();
   restoreFile();
+  initOneDrive();
 });
 </script>
 </body>
