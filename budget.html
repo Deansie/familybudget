@@ -318,34 +318,12 @@ dialog::backdrop{background:rgba(10,15,29,.45);backdrop-filter:blur(2px)}
     </div>
 
     <div class="side-section">
-      <button class="btn block" id="newMonthBtn" type="button">+ Ny månad</button>
-    </div>
-
-    <div class="side-section">
       <div class="side-label"><span>OneDrive</span></div>
       <div class="storage">
         <div class="st-row"><span class="dot" id="odDot"></span><span class="st-name" id="odName">Inte inloggad</span></div>
         <div id="odHint" style="font-size:.76rem">Logga in för automatisk synk på alla enheter.</div>
         <button class="btn ghost sm block" id="onedriveBtn" type="button">☁ Logga in med OneDrive</button>
       </div>
-    </div>
-
-    <div class="side-section">
-      <div class="side-label"><span>Lokal fil / säkerhetskopia</span></div>
-      <div class="storage">
-        <div class="st-row"><span class="dot" id="storeDot"></span><span class="st-name" id="storeName">Inte kopplad</span></div>
-        <div id="storeHint" style="font-size:.76rem">Koppla din <b>budget.json</b> så sparas allt automatiskt.</div>
-        <button class="btn ghost sm block" id="connectBtn" type="button" style="display:none">Koppla fil…</button>
-        <div class="btn-row">
-          <button class="btn ghost sm" id="exportBtn" type="button">⬇ Exportera</button>
-          <button class="btn ghost sm" id="importBtn" type="button">⬆ Importera</button>
-        </div>
-      </div>
-      <input type="file" id="importInput" accept=".json,application/json" style="display:none" />
-    </div>
-
-    <div class="side-section">
-      <button class="btn ghost sm block" id="toggleThemeBtn" type="button">🌗 Växla tema</button>
     </div>
   </aside>
 
@@ -455,7 +433,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const $ = id => document.getElementById(id);
 
   let state = loadLocal();
-  let fileHandle = null;          // FileSystemFileHandle when connected
   let pca = null, msAccount = null; // MSAL instance + signed-in OneDrive account
   const saveDebounced = debounce(saveAll, 600);
 
@@ -478,21 +455,10 @@ document.addEventListener('DOMContentLoaded', () => {
     catch(e){ console.error('Lokal sparning misslyckades', e); }
   }
 
-  // Save to localStorage always, plus the connected file and/or OneDrive if available.
+  // Save to localStorage always, plus OneDrive when signed in.
   async function saveAll(){
     state.lastSavedLocal = new Date().toISOString();
     persistLocal();
-    if(fileHandle){
-      try{
-        const w = await fileHandle.createWritable();
-        await w.write(JSON.stringify(state, null, 2));
-        await w.close();
-        setStorageStatus('ok', fileHandle.name, 'Sparad ' + timeNow());
-      }catch(e){
-        console.warn('Filsparning misslyckades', e);
-        setStorageStatus('warn', fileHandle.name, 'Kunde inte spara till filen');
-      }
-    }
     if(pca && msAccount) pushToOneDrive(); // fire-and-forget cloud sync
   }
 
@@ -611,7 +577,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const amtWrap = document.createElement('div'); amtWrap.className='amt-wrap';
     const amt = document.createElement('input');
-    amt.className='inp amt'; amt.type='number'; amt.placeholder='0'; amt.inputMode='numeric';
+    amt.className='inp amt'; amt.type='number'; amt.placeholder='0'; amt.inputMode='numeric'; amt.step='100';
     amt.value = (item.amount!=null && item.amount!==0) ? item.amount : (item.amount===0?'':'');
     amt.setAttribute('aria-label','Belopp');
     amt.addEventListener('input', e=>{ item.amount=Number(e.target.value)||0; renderTotals(); updateBars(); saveDebounced(); });
@@ -680,6 +646,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const left = $('fbLeftLabel');
     left.textContent = (balance<0?'Underskott ':'Kvar ') + formatMoney(Math.abs(balance));
     left.className = 'fb-foot-left';
+
+    // keep the active month chip's balance live (no need to switch months to refresh)
+    const chipBal = document.querySelector('#monthRail .mchip.active .mc-bal');
+    if(chipBal){ chipBal.textContent = formatMoney(balance); chipBal.className = 'mc-bal ' + (balance<0?'neg':'pos'); }
   }
 
   /* ---------------- Actions ---------------- */
@@ -729,107 +699,10 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
-  /* ---------------- Theme ---------------- */
-  function toggleTheme(){
-    state.theme = state.theme==='light' ? 'dark' : state.theme==='dark' ? 'auto' : 'light';
-    saveDebounced(); applyTheme();
-    toast('ok','Tema: '+({light:'ljust',dark:'mörkt',auto:'auto'}[state.theme]));
-  }
+  /* ---------------- Theme (always follows the system setting) ---------------- */
   function applyTheme(){
-    let t = state.theme || 'auto';
-    if(t==='auto') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    document.documentElement.setAttribute('data-theme', t);
-  }
-
-  /* ---------------- File handle (persisted in IndexedDB) ---------------- */
-  const IDB = { name:'budgetApp', store:'handles', key:'fileHandle' };
-  function idb(){
-    return new Promise((res,rej)=>{
-      const r = indexedDB.open(IDB.name,1);
-      r.onupgradeneeded = ()=> r.result.createObjectStore(IDB.store);
-      r.onsuccess = ()=> res(r.result);
-      r.onerror = ()=> rej(r.error);
-    });
-  }
-  async function idbSet(v){ const db=await idb(); return new Promise((res,rej)=>{ const tx=db.transaction(IDB.store,'readwrite'); tx.objectStore(IDB.store).put(v,IDB.key); tx.oncomplete=res; tx.onerror=()=>rej(tx.error); }); }
-  async function idbGet(){ const db=await idb(); return new Promise((res,rej)=>{ const tx=db.transaction(IDB.store,'readonly'); const rq=tx.objectStore(IDB.store).get(IDB.key); rq.onsuccess=()=>res(rq.result); rq.onerror=()=>rej(rq.error); }); }
-  async function idbClear(){ const db=await idb(); return new Promise((res,rej)=>{ const tx=db.transaction(IDB.store,'readwrite'); tx.objectStore(IDB.store).delete(IDB.key); tx.oncomplete=res; tx.onerror=()=>rej(tx.error); }); }
-
-  function setStorageStatus(level, name, hint){
-    const dot=$('storeDot'); dot.className='dot'+(level==='ok'?' ok':level==='warn'?' warn':'');
-    $('storeName').textContent = name || 'Inte kopplad';
-    if(hint) $('storeHint').innerHTML = hint;
-    $('connectBtn').textContent = fileHandle ? 'Byt fil…' : 'Koppla fil…';
-  }
-
-  async function verifyPermission(handle, write){
-    const opts = { mode: write?'readwrite':'read' };
-    if((await handle.queryPermission(opts))==='granted') return true;
-    if((await handle.requestPermission(opts))==='granted') return true;
-    return false;
-  }
-
-  // Let the user pick/create budget.json. Reads it if it has content, else writes current state.
-  async function connectFile(){
-    if(!window.showOpenFilePicker){
-      // Fallback for browsers without File System Access API: download + manual import
-      fallbackExport();
-      return;
-    }
-    try{
-      const [handle] = await window.showOpenFilePicker({
-        types:[{description:'JSON', accept:{'application/json':['.json']}}],
-        multiple:false
-      });
-      if(!(await verifyPermission(handle, true))){ toast('warn','Behörighet nekades'); return; }
-      fileHandle = handle;
-      await idbSet(handle);
-      const file = await handle.getFile();
-      const text = (await file.text()).trim();
-      if(text){
-        if(loadFromJson(text)){ toast('ok','Läste in '+handle.name); }
-      }else{
-        await saveAll(); toast('ok','Kopplade '+handle.name);
-      }
-      setStorageStatus('ok', handle.name, 'Sparas automatiskt');
-      render();
-    }catch(e){
-      if(e && e.name==='AbortError') return;
-      console.warn(e); toast('warn','Kunde inte koppla filen');
-    }
-  }
-
-  // On startup, try to silently re-use a previously connected file.
-  async function restoreFile(){
-    if(!window.showOpenFilePicker) { setStorageStatus('ok', 'Lokal lagring (iPhone/Safari)', 'Autokoppling finns bara på dator. Synka med OneDrive via <b>Importera/Exportera</b> nedan.'); return; }
-    try{
-      const handle = await idbGet();
-      if(!handle) { setStorageStatus('', 'Inte kopplad'); return; }
-      const perm = await handle.queryPermission({mode:'readwrite'});
-      if(perm==='granted'){
-        fileHandle = handle;
-        const file = await handle.getFile();
-        const text = (await file.text()).trim();
-        if(text) loadFromJson(text);
-        setStorageStatus('ok', handle.name, 'Sparas automatiskt');
-        render();
-      }else{
-        // needs a user gesture to re-grant; offer reconnect
-        setStorageStatus('warn', handle.name, 'Klicka för att återansluta');
-        $('connectBtn').textContent = 'Återanslut '+handle.name;
-        $('connectBtn').onclick = async ()=>{
-          if(await verifyPermission(handle, true)){
-            fileHandle = handle;
-            const file = await handle.getFile();
-            const text=(await file.text()).trim();
-            if(text) loadFromJson(text);
-            setStorageStatus('ok', handle.name, 'Sparas automatiskt');
-            $('connectBtn').onclick = connectFile;
-            render(); toast('ok','Återansluten');
-          }
-        };
-      }
-    }catch(e){ console.warn('restoreFile', e); setStorageStatus('', 'Inte kopplad'); }
+    const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
   }
 
   function loadFromJson(text){
@@ -845,42 +718,6 @@ document.addEventListener('DOMContentLoaded', () => {
       persistLocal();
       return true;
     }catch(e){ toast('warn','Kunde inte läsa filen'); return false; }
-  }
-
-  // Manual export — works in every browser (incl. iOS). Download budget.json,
-  // then save it back to OneDrive via the share sheet / Save dialog.
-  async function exportFile(){
-    const data = JSON.stringify(state,null,2);
-    // Mobile (iOS/Android): open the native share sheet so the file can go
-    // straight to OneDrive / "Spara i Filer" instead of the Downloads folder.
-    try{
-      const file = new File([data], 'budget.json', {type:'application/json'});
-      if(navigator.canShare && navigator.canShare({files:[file]})){
-        await navigator.share({files:[file], title:'budget.json'});
-        toast('ok','Delad – välj OneDrive eller Spara i Filer');
-        return;
-      }
-    }catch(e){
-      if(e && e.name==='AbortError') return; // user cancelled the share sheet
-      console.warn('Web Share ej tillgänglig, laddar ner istället', e);
-    }
-    // Desktop fallback: regular download.
-    const blob = new Blob([data], {type:'application/json'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href=url; a.download='budget.json';
-    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-    toast('ok','Laddade ner budget.json');
-  }
-  const fallbackExport = exportFile;
-
-  // Manual import — works everywhere. Pick a budget.json (e.g. from OneDrive).
-  function importFile(){ $('importInput').value=''; $('importInput').click(); }
-  function onImportPicked(){
-    const f = $('importInput').files[0];
-    if(!f) return;
-    const reader = new FileReader();
-    reader.onload = ()=>{ if(loadFromJson(reader.result)){ render(); toast('ok','Importerade '+f.name); } };
-    reader.readAsText(f);
   }
 
   /* ---------------- OneDrive sync (Microsoft Graph + MSAL) ---------------- */
@@ -992,26 +829,20 @@ document.addEventListener('DOMContentLoaded', () => {
   /* ---------------- Wire up ---------------- */
   $('addIncomeBtn').addEventListener('click', addIncome);
   $('addExpenseBtn').addEventListener('click', addExpense);
-  $('newMonthBtn').addEventListener('click', newMonth);
   $('prevMonth').addEventListener('click', ()=>stepMonth(-1));
   $('nextMonth').addEventListener('click', ()=>stepMonth(1));
-  $('toggleThemeBtn').addEventListener('click', toggleTheme);
-  $('connectBtn').onclick = connectFile;
-  $('exportBtn').addEventListener('click', exportFile);
-  $('importBtn').addEventListener('click', importFile);
-  $('importInput').addEventListener('change', onImportPicked);
   $('onedriveBtn').onclick = signInOneDrive;
-
-  // Auto-save to a connected file only exists where the File System Access API does.
-  if(window.showOpenFilePicker) $('connectBtn').style.display = '';
 
   window.addEventListener('keydown', (e)=>{
     if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='s'){ e.preventDefault(); saveAll().then(()=>toast('ok','Sparat')); }
   });
-  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', ()=>{ if((state.theme||'auto')==='auto') applyTheme(); });
+
+  // Follow the OS light/dark setting live (addEventListener on newer Safari/Chrome, addListener on older iOS).
+  const mq = matchMedia('(prefers-color-scheme: dark)');
+  if(mq.addEventListener) mq.addEventListener('change', applyTheme);
+  else if(mq.addListener) mq.addListener(applyTheme);
 
   render();
-  restoreFile();
   initOneDrive();
 });
 </script>
