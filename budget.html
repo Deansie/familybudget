@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Familjebudget</title>
+
+<style>
+:root{
+  --bg:#f6f8fb;
+  --bg-grad:radial-gradient(1200px 600px at 100% -10%, rgba(37,99,235,.06), transparent 60%);
+  --card:#ffffff;
+  --card-2:#fbfcfe;
+  --text:#0f172a;
+  --muted:#667085;
+  --faint:#98a2b3;
+  --border:#e7eaf0;
+  --border-strong:#d7dce4;
+  --accent:#2563eb;
+  --accent-soft:#eaf0fe;
+  --success:#16a34a;
+  --success-soft:#e7f6ec;
+  --danger:#e11d48;
+  --danger-soft:#fdecef;
+  --track:#eef1f6;
+  --radius:14px;
+  --radius-sm:10px;
+  --gap:18px;
+  --shadow:0 1px 2px rgba(16,24,40,.04), 0 8px 24px rgba(16,24,40,.06);
+  --shadow-sm:0 1px 2px rgba(16,24,40,.06);
+  font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial;
+  font-size:16px;
+  color-scheme:light;
+}
+
+[data-theme="dark"]{
+  --bg:#0a0f1d;
+  --bg-grad:radial-gradient(1200px 600px at 100% -10%, rgba(59,130,246,.10), transparent 60%);
+  --card:#10182b;
+  --card-2:#0d1424;
+  --text:#e8eefb;
+  --muted:#94a3bd;
+  --faint:#64748b;
+  --border:#1d2740;
+  --border-strong:#283450;
+  --accent:#5b8cff;
+  --accent-soft:#16224a;
+  --success:#34d399;
+  --success-soft:#0f2a22;
+  --danger:#fb7185;
+  --danger-soft:#2a1420;
+  --track:#1a2238;
+  --shadow:0 1px 2px rgba(0,0,0,.3), 0 12px 30px rgba(0,0,0,.45);
+  --shadow-sm:0 1px 2px rgba(0,0,0,.4);
+  color-scheme:dark;
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--bg);
+  background-image:var(--bg-grad);
+  background-attachment:fixed;
+  color:var(--text);
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+  padding:22px;
+  line-height:1.45;
+}
+
+/* ---------- Layout ---------- */
+.container{
+  max-width:1180px;
+  margin:0 auto;
+  display:grid;
+  grid-template-columns:290px 1fr;
+  gap:var(--gap);
+  align-items:start;
+}
+
+/* ---------- Sidebar ---------- */
+.sidebar{
+  position:sticky; top:22px;
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:18px;
+  box-shadow:var(--shadow);
+  display:flex; flex-direction:column; gap:16px;
+}
+.brand{display:flex;align-items:center;gap:12px}
+.logo{
+  width:42px;height:42px;border-radius:12px;
+  background:linear-gradient(135deg,var(--accent),#8b5cf6);
+  display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:17px;
+  box-shadow:0 4px 12px rgba(37,99,235,.35);
+}
+.brand h1{font-size:1.06rem;font-weight:700;letter-spacing:-.01em}
+.brand .muted{font-size:.82rem}
+
+.side-section{display:flex;flex-direction:column;gap:8px}
+.side-label{
+  font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);
+  display:flex;justify-content:space-between;align-items:center;
+}
+
+/* Month list */
+.months{display:flex;flex-direction:column;gap:4px;max-height:46vh;overflow:auto;margin:0 -6px;padding:0 6px}
+.month-item{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:9px 11px;border-radius:var(--radius-sm);
+  border:1px solid transparent;color:var(--text);cursor:pointer;background:transparent;
+  text-align:left;width:100%;font:inherit;transition:background .12s,border-color .12s;
+}
+.month-item:hover{background:var(--card-2);border-color:var(--border)}
+.month-item.active{background:var(--accent-soft);border-color:transparent;color:var(--accent);font-weight:700}
+.month-item .mi-main{display:flex;flex-direction:column;line-height:1.2;min-width:0}
+.month-item .mi-name{font-size:.95rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.month-item .mi-sub{font-size:.74rem;color:var(--muted);font-weight:500}
+.month-item.active .mi-sub{color:var(--accent);opacity:.8}
+.month-item .mi-bal{font-size:.8rem;font-weight:700;white-space:nowrap}
+.mi-del{
+  opacity:0;border:none;background:transparent;color:var(--faint);cursor:pointer;
+  padding:2px 4px;border-radius:6px;font-size:15px;line-height:1;flex:none;
+}
+.month-item:hover .mi-del{opacity:1}
+.mi-del:hover{background:var(--danger-soft);color:var(--danger)}
+
+/* Buttons */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  padding:10px 13px;border-radius:var(--radius-sm);border:1px solid transparent;
+  background:var(--accent);color:#fff;cursor:pointer;font-weight:600;font-size:.92rem;
+  transition:filter .12s,background .12s,border-color .12s;white-space:nowrap;
+}
+.btn:hover{filter:brightness(1.05)}
+.btn:active{filter:brightness(.95)}
+.btn.ghost{background:transparent;color:var(--text);border-color:var(--border-strong)}
+.btn.ghost:hover{background:var(--card-2);filter:none}
+.btn.block{width:100%}
+.btn.sm{padding:8px 10px;font-size:.85rem}
+.btn-row{display:flex;gap:8px}
+.btn-row .btn{flex:1}
+
+/* Storage box */
+.storage{
+  background:var(--card-2);border:1px solid var(--border);border-radius:var(--radius-sm);
+  padding:11px 12px;display:flex;flex-direction:column;gap:8px;font-size:.8rem;color:var(--muted);
+}
+.storage .st-row{display:flex;align-items:center;gap:8px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--faint);flex:none}
+.dot.ok{background:var(--success)}
+.dot.warn{background:#f59e0b}
+.st-name{font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ---------- Main ---------- */
+.main{display:flex;flex-direction:column;gap:var(--gap)}
+.page-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.page-head h2{font-size:1.5rem;font-weight:800;letter-spacing:-.02em}
+.page-head .sub{color:var(--muted);font-size:.9rem;margin-top:2px}
+
+/* Summary cards */
+.top-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.card{
+  background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+  padding:16px 18px;box-shadow:var(--shadow-sm);position:relative;overflow:hidden;
+}
+.card h3{font-size:.78rem;color:var(--muted);font-weight:600;letter-spacing:.02em;display:flex;align-items:center;gap:6px}
+.card .value{font-size:1.7rem;font-weight:800;letter-spacing:-.02em;margin-top:6px;font-variant-numeric:tabular-nums}
+.card.accent{background:linear-gradient(160deg,var(--accent-soft),var(--card))}
+.card .pill{
+  position:absolute;top:14px;right:14px;font-size:.72rem;font-weight:700;
+  padding:3px 8px;border-radius:999px;background:var(--track);color:var(--muted);
+}
+.pos{color:var(--success)} .neg{color:var(--danger)}
+.pill.pos{background:var(--success-soft);color:var(--success)}
+.pill.neg{background:var(--danger-soft);color:var(--danger)}
+
+/* Income vs expense bar */
+.flowbar{
+  background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+  padding:14px 18px;box-shadow:var(--shadow-sm);
+}
+.flowbar .fb-head{display:flex;justify-content:space-between;font-size:.82rem;color:var(--muted);margin-bottom:9px}
+.flowbar .fb-head b{color:var(--text);font-variant-numeric:tabular-nums}
+.track{height:12px;border-radius:999px;background:var(--track);overflow:hidden;position:relative}
+.track .fill{height:100%;border-radius:999px;transition:width .35s ease;background:linear-gradient(90deg,var(--accent),#8b5cf6)}
+.track .fill.over{background:linear-gradient(90deg,#f59e0b,var(--danger))}
+.flowbar .fb-foot{display:flex;justify-content:space-between;font-size:.78rem;color:var(--faint);margin-top:7px}
+
+/* Sections */
+.section{
+  background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+  padding:16px 18px 8px;box-shadow:var(--shadow-sm);
+}
+.section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.section-header h2{font-size:1.05rem;font-weight:700}
+.section-header .total{font-size:.95rem;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
+
+/* Rows */
+.rows{display:flex;flex-direction:column}
+.col-head{
+  display:grid;grid-template-columns:1fr 132px 64px 34px;gap:10px;align-items:center;
+  padding:6px 4px;font-size:.72rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--faint);
+}
+.col-head .ch-amt{text-align:right;padding-right:4px}
+.col-head .ch-fixed,.col-head .ch-del{text-align:center}
+.item{padding:5px 0;border-top:1px solid var(--border)}
+.item:first-child{border-top:none}
+.row{display:grid;grid-template-columns:1fr 132px 64px 34px;gap:10px;align-items:center}
+.inp{
+  width:100%;padding:9px 11px;border-radius:var(--radius-sm);border:1px solid transparent;
+  background:transparent;color:var(--text);font:inherit;transition:border-color .12s,background .12s;
+}
+.inp:hover{background:var(--card-2)}
+.inp:focus{outline:none;border-color:var(--accent);background:var(--card)}
+.inp.name{font-weight:600}
+.amt-wrap{position:relative}
+.inp.amt{text-align:right;padding-right:30px;font-variant-numeric:tabular-nums}
+.amt-wrap .kr{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:.78rem;color:var(--faint);pointer-events:none}
+.fixed-toggle{display:flex;justify-content:center}
+.fixed-toggle input{width:16px;height:16px;accent-color:var(--accent);cursor:pointer}
+.row-del{
+  border:none;background:transparent;color:var(--faint);cursor:pointer;
+  border-radius:8px;padding:6px;font-size:16px;line-height:1;
+}
+.row-del:hover{background:var(--danger-soft);color:var(--danger)}
+
+/* per-expense bar */
+.item-bar{height:5px;border-radius:999px;background:var(--track);margin:4px 4px 2px;overflow:hidden}
+.item-bar .ib-fill{height:100%;border-radius:999px;background:var(--accent);opacity:.55;transition:width .3s}
+.item-bar .ib-fill.big{opacity:.8}
+
+.empty{padding:14px 6px;color:var(--faint);font-size:.9rem}
+.add-row{padding:6px 0 10px}
+.add-row .btn{font-size:.88rem}
+
+/* Toast */
+.toasts{position:fixed;right:18px;bottom:18px;display:flex;flex-direction:column;gap:8px;z-index:50}
+.toast{
+  background:var(--card);border:1px solid var(--border);box-shadow:var(--shadow);
+  border-radius:var(--radius-sm);padding:11px 14px;font-size:.88rem;color:var(--text);
+  display:flex;align-items:center;gap:9px;min-width:200px;
+  animation:slidein .2s ease;
+}
+.toast .dot{width:9px;height:9px}
+@keyframes slidein{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+/* Dialog */
+dialog{
+  border:1px solid var(--border);border-radius:var(--radius);padding:0;background:var(--card);color:var(--text);
+  box-shadow:var(--shadow);max-width:380px;width:calc(100% - 32px);
+}
+dialog::backdrop{background:rgba(10,15,29,.45);backdrop-filter:blur(2px)}
+.dlg-body{padding:20px}
+.dlg-body h3{font-size:1.1rem;font-weight:700;margin-bottom:6px}
+.dlg-body p{color:var(--muted);font-size:.9rem;margin-bottom:14px}
+.dlg-field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+.dlg-field label{font-size:.82rem;font-weight:600;color:var(--muted)}
+.dlg-field input[type=month]{
+  padding:10px 12px;border-radius:var(--radius-sm);border:1px solid var(--border-strong);
+  background:var(--card-2);color:var(--text);font:inherit;
+}
+.dlg-check{display:flex;align-items:center;gap:9px;font-size:.9rem;color:var(--text);margin-bottom:4px;cursor:pointer}
+.dlg-check input{width:16px;height:16px;accent-color:var(--accent)}
+.dlg-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}
+
+/* ---------- Responsive ---------- */
+@media (max-width:920px){
+  .container{grid-template-columns:1fr}
+  .sidebar{position:static;top:auto}
+  .months{flex-direction:row;max-height:none;overflow:auto;padding-bottom:4px}
+  .month-item{min-width:150px}
+  .mi-del{opacity:1}
+}
+@media (max-width:560px){
+  body{padding:12px}
+  .top-cards{grid-template-columns:1fr}
+  .col-head{display:none}
+  .row{grid-template-columns:1fr 110px 30px;grid-template-areas:"name amt del" "fixed fixed fixed"}
+  .row .inp.name{grid-area:name}
+  .row .amt-wrap{grid-area:amt}
+  .row .fixed-toggle{grid-area:fixed;justify-content:flex-start;gap:8px}
+  .row .fixed-toggle::after{content:"Fast post";font-size:.82rem;color:var(--muted)}
+  .row .row-del{grid-area:del}
+}
+</style>
+</head>
+
+<body>
+<div id="app" class="container" role="application" aria-label="Familjebudget">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo" aria-hidden="true">FB</div>
+      <div>
+        <h1>Familjebudget</h1>
+        <div class="muted">Planera era månader</div>
+      </div>
+    </div>
+
+    <div class="side-section">
+      <button class="btn block" id="newMonthBtn" type="button">+ Ny månad</button>
+    </div>
+
+    <div class="side-section">
+      <div class="side-label"><span>Månader</span></div>
+      <nav class="months" id="monthList" aria-label="Lista över månader"></nav>
+    </div>
+
+    <div class="side-section">
+      <div class="side-label"><span>Lagring</span></div>
+      <div class="storage">
+        <div class="st-row"><span class="dot" id="storeDot"></span><span class="st-name" id="storeName">Inte kopplad</span></div>
+        <div id="storeHint" style="font-size:.76rem">Koppla din <b>budget.json</b> så sparas allt automatiskt.</div>
+        <button class="btn ghost sm block" id="connectBtn" type="button" style="display:none">Koppla fil…</button>
+        <div class="btn-row">
+          <button class="btn ghost sm" id="exportBtn" type="button">⬇ Exportera</button>
+          <button class="btn ghost sm" id="importBtn" type="button">⬆ Importera</button>
+        </div>
+      </div>
+      <input type="file" id="importInput" accept=".json,application/json" style="display:none" />
+    </div>
+
+    <div class="side-section">
+      <button class="btn ghost sm block" id="toggleThemeBtn" type="button">🌗 Växla tema</button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main" role="main">
+    <div class="page-head">
+      <div>
+        <h2 id="monthTitle">—</h2>
+        <div class="sub" id="monthSub"></div>
+      </div>
+    </div>
+
+    <section class="top-cards" aria-label="Summering">
+      <div class="card">
+        <h3>Intäkter</h3>
+        <div class="value" id="incomeTotal">0 kr</div>
+      </div>
+      <div class="card">
+        <h3>Utgifter</h3>
+        <div class="value" id="expenseTotal">0 kr</div>
+      </div>
+      <div class="card accent">
+        <span class="pill" id="savingsPill">—</span>
+        <h3>Kvar</h3>
+        <div class="value" id="balanceTotal">0 kr</div>
+      </div>
+    </section>
+
+    <section class="flowbar" aria-label="Intäkter mot utgifter">
+      <div class="fb-head">
+        <span>Använt av intäkterna: <b id="fbSpent">0 kr</b></span>
+        <span id="fbPct">0%</span>
+      </div>
+      <div class="track"><div class="fill" id="fbFill" style="width:0%"></div></div>
+      <div class="fb-foot">
+        <span>Intäkter <b id="fbIncome">0 kr</b></span>
+        <span id="fbLeftLabel">Kvar 0 kr</span>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="incomeHeading">
+      <div class="section-header">
+        <h2 id="incomeHeading">Intäkter</h2>
+        <span class="total" id="incomeHeadTotal">0 kr</span>
+      </div>
+      <div class="col-head"><span>Namn</span><span class="ch-amt">Belopp</span><span class="ch-fixed">Fast</span><span class="ch-del"></span></div>
+      <div class="rows" id="incomeRows"></div>
+      <div class="add-row"><button class="btn ghost sm" id="addIncomeBtn" type="button">+ Lägg till intäkt</button></div>
+    </section>
+
+    <section class="section" aria-labelledby="expenseHeading">
+      <div class="section-header">
+        <h2 id="expenseHeading">Utgifter</h2>
+        <span class="total" id="expenseHeadTotal">0 kr</span>
+      </div>
+      <div class="col-head"><span>Namn</span><span class="ch-amt">Belopp</span><span class="ch-fixed">Fast</span><span class="ch-del"></span></div>
+      <div class="rows" id="expenseRows"></div>
+      <div class="add-row"><button class="btn ghost sm" id="addExpenseBtn" type="button">+ Lägg till utgift</button></div>
+    </section>
+  </main>
+</div>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<!-- New month dialog -->
+<dialog id="monthDialog">
+  <form method="dialog" class="dlg-body" id="monthForm">
+    <h3>Ny månad</h3>
+    <p>Välj vilken månad du vill lägga till.</p>
+    <div class="dlg-field">
+      <label for="monthInput">Månad</label>
+      <input type="month" id="monthInput" required />
+    </div>
+    <label class="dlg-check"><input type="checkbox" id="copyCheck" checked /> Kopiera poster från nuvarande månad</label>
+    <div class="dlg-actions">
+      <button class="btn ghost" value="cancel" type="submit">Avbryt</button>
+      <button class="btn" value="ok" id="monthOk" type="submit">Skapa</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Confirm dialog -->
+<dialog id="confirmDialog">
+  <form method="dialog" class="dlg-body">
+    <h3 id="confirmTitle">Bekräfta</h3>
+    <p id="confirmText"></p>
+    <div class="dlg-actions">
+      <button class="btn ghost" value="cancel" type="submit">Avbryt</button>
+      <button class="btn" value="ok" id="confirmOk" type="submit" style="background:var(--danger)">Ta bort</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  'use strict';
+  const STORAGE_KEY = 'family_budget_v2';
+  const $ = id => document.getElementById(id);
+
+  let state = loadLocal();
+  let fileHandle = null;          // FileSystemFileHandle when connected
+  const saveDebounced = debounce(saveAll, 600);
+
+  /* ---------------- State ---------------- */
+  function loadLocal(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if(raw){
+        const p = JSON.parse(raw);
+        if(!p.months || typeof p.months !== 'object') p.months = {};
+        return p;
+      }
+    }catch(e){ console.warn('Kunde inte läsa lokalt sparad data', e); }
+    const key = monthKey(new Date());
+    return { theme:'auto', currentMonth:key, months:{ [key]:{ income:[], expenses:[] } } };
+  }
+
+  function persistLocal(){
+    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+    catch(e){ console.error('Lokal sparning misslyckades', e); }
+  }
+
+  // Save to localStorage always, and to the connected file if available.
+  async function saveAll(){
+    state.lastSavedLocal = new Date().toISOString();
+    persistLocal();
+    if(fileHandle){
+      try{
+        const w = await fileHandle.createWritable();
+        await w.write(JSON.stringify(state, null, 2));
+        await w.close();
+        setStorageStatus('ok', fileHandle.name, 'Sparad ' + timeNow());
+      }catch(e){
+        console.warn('Filsparning misslyckades', e);
+        setStorageStatus('warn', fileHandle.name, 'Kunde inte spara till filen');
+      }
+    }
+  }
+
+  function debounce(fn, wait){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),wait); }; }
+
+  /* ---------------- Helpers ---------------- */
+  const MONTH_NAMES = ['januari','februari','mars','april','maj','juni','juli','augusti','september','oktober','november','december'];
+  function monthKey(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; }
+  function formatMoney(v){ return (Math.round(Number(v)||0)).toLocaleString('sv-SE') + ' kr'; }
+  function timeNow(){ return new Date().toLocaleTimeString('sv-SE',{hour:'2-digit',minute:'2-digit'}); }
+  function monthLabel(key){
+    const [y,m] = (key||'').split('-');
+    if(!y||!m) return key;
+    const name = MONTH_NAMES[Number(m)-1] || m;
+    return name.charAt(0).toUpperCase()+name.slice(1)+' '+y;
+  }
+  function ensureMonth(key){ if(!state.months[key]) state.months[key] = { income:[], expenses:[] }; }
+  function currentMonth(){ ensureMonth(state.currentMonth); return state.months[state.currentMonth]; }
+  function sum(arr){ return arr.reduce((s,i)=>s+(Number(i.amount)||0),0); }
+  function monthBalance(key){ const m=state.months[key]; return m ? sum(m.income)-sum(m.expenses) : 0; }
+
+  /* ---------------- Render ---------------- */
+  function render(){ applyTheme(); renderMonths(); renderHead(); renderRows(); renderTotals(); }
+
+  function renderMonths(){
+    const c = $('monthList'); c.innerHTML = '';
+    Object.keys(state.months).sort().reverse().forEach(k => {
+      const btn = document.createElement('button');
+      btn.className = 'month-item' + (k===state.currentMonth ? ' active' : '');
+      btn.type = 'button';
+      const bal = monthBalance(k);
+      btn.innerHTML =
+        `<span class="mi-main"><span class="mi-name">${monthLabel(k)}</span><span class="mi-sub">${k}</span></span>`+
+        `<span class="mi-bal ${bal<0?'neg':'pos'}">${formatMoney(bal)}</span>`;
+      btn.addEventListener('click', ()=>{ state.currentMonth=k; saveDebounced(); render(); });
+      const del = document.createElement('button');
+      del.className = 'mi-del'; del.type='button'; del.title='Ta bort månad'; del.textContent='×';
+      del.addEventListener('click', (e)=>{ e.stopPropagation(); deleteMonth(k); });
+      btn.appendChild(del);
+      c.appendChild(btn);
+    });
+  }
+
+  function renderHead(){
+    $('monthTitle').textContent = monthLabel(state.currentMonth);
+    const m = currentMonth();
+    const n = m.income.length + m.expenses.length;
+    $('monthSub').textContent = n ? `${m.income.length} intäkter · ${m.expenses.length} utgifter` : 'Inga poster ännu';
+  }
+
+  function renderRows(){
+    const m = currentMonth();
+    const maxExp = Math.max(0, ...m.expenses.map(i=>Number(i.amount)||0));
+    fillSection('incomeRows', m.income, 'income', 0);
+    fillSection('expenseRows', m.expenses, 'expense', maxExp);
+  }
+
+  function fillSection(containerId, list, type, maxExp){
+    const c = $(containerId); c.innerHTML = '';
+    if(!list.length){
+      const e = document.createElement('div'); e.className='empty';
+      e.textContent = type==='income' ? 'Inga intäkter ännu.' : 'Inga utgifter ännu.';
+      c.appendChild(e); return;
+    }
+    list.forEach((item, idx)=> c.appendChild(createRow(type, item, idx, maxExp)));
+  }
+
+  function createRow(type, item, idx, maxExp){
+    const wrap = document.createElement('div'); wrap.className='item';
+    const row = document.createElement('div'); row.className='row';
+
+    const name = document.createElement('input');
+    name.className='inp name'; name.placeholder='Namn'; name.value=item.name||'';
+    name.setAttribute('aria-label','Namn');
+    name.addEventListener('input', e=>{ item.name=e.target.value; saveDebounced(); });
+
+    const amtWrap = document.createElement('div'); amtWrap.className='amt-wrap';
+    const amt = document.createElement('input');
+    amt.className='inp amt'; amt.type='number'; amt.placeholder='0'; amt.inputMode='numeric';
+    amt.value = (item.amount!=null && item.amount!==0) ? item.amount : (item.amount===0?'':'');
+    amt.setAttribute('aria-label','Belopp');
+    amt.addEventListener('input', e=>{ item.amount=Number(e.target.value)||0; renderTotals(); updateBars(); saveDebounced(); });
+    const kr = document.createElement('span'); kr.className='kr'; kr.textContent='kr';
+    amtWrap.appendChild(amt); amtWrap.appendChild(kr);
+
+    const fixedWrap = document.createElement('label'); fixedWrap.className='fixed-toggle'; fixedWrap.title='Fast post';
+    const fixed = document.createElement('input'); fixed.type='checkbox'; fixed.checked=!!item.fixed;
+    fixed.setAttribute('aria-label','Fast post');
+    fixed.addEventListener('change', e=>{ item.fixed=e.target.checked; saveDebounced(); });
+    fixedWrap.appendChild(fixed);
+
+    const del = document.createElement('button');
+    del.className='row-del'; del.type='button'; del.title='Ta bort'; del.textContent='×';
+    del.addEventListener('click', ()=>{
+      const m = currentMonth();
+      (type==='income'?m.income:m.expenses).splice(idx,1);
+      saveDebounced(); render();
+    });
+
+    row.append(name, amtWrap, fixedWrap, del);
+    wrap.appendChild(row);
+
+    if(type==='expense'){
+      const bar = document.createElement('div'); bar.className='item-bar';
+      const fill = document.createElement('div'); fill.className='ib-fill';
+      const val = Number(item.amount)||0;
+      const pct = maxExp>0 ? (val/maxExp*100) : 0;
+      fill.style.width = pct.toFixed(1)+'%';
+      if(pct>66) fill.classList.add('big');
+      bar.appendChild(fill); wrap.appendChild(bar);
+      wrap._barFill = fill; wrap._item = item;
+    }
+    return wrap;
+  }
+
+  // Lightweight bar refresh without full re-render (during typing)
+  function updateBars(){
+    const m = currentMonth();
+    const maxExp = Math.max(0, ...m.expenses.map(i=>Number(i.amount)||0));
+    $('expenseRows').querySelectorAll('.item').forEach(el=>{
+      if(!el._barFill || !el._item) return;
+      const val = Number(el._item.amount)||0;
+      const pct = maxExp>0 ? (val/maxExp*100) : 0;
+      el._barFill.style.width = pct.toFixed(1)+'%';
+      el._barFill.classList.toggle('big', pct>66);
+    });
+  }
+
+  function renderTotals(){
+    const m = currentMonth();
+    const income = sum(m.income), expenses = sum(m.expenses), balance = income-expenses;
+
+    $('incomeTotal').textContent  = formatMoney(income);
+    $('expenseTotal').textContent = formatMoney(expenses);
+    $('balanceTotal').textContent = formatMoney(balance);
+    $('balanceTotal').className   = 'value ' + (balance<0?'neg':'pos');
+    $('incomeHeadTotal').textContent  = formatMoney(income);
+    $('expenseHeadTotal').textContent = formatMoney(expenses);
+
+    // savings rate
+    const rate = income>0 ? Math.round(balance/income*100) : 0;
+    const pill = $('savingsPill');
+    pill.textContent = (rate>=0?'↑ ':'↓ ') + Math.abs(rate) + '% sparkvot';
+    pill.className = 'pill ' + (balance<0?'neg':'pos');
+
+    // flow bar
+    const spentPct = income>0 ? Math.min(100, expenses/income*100) : (expenses>0?100:0);
+    const fill = $('fbFill');
+    fill.style.width = spentPct.toFixed(1)+'%';
+    fill.classList.toggle('over', expenses>income && income>0);
+    $('fbSpent').textContent  = formatMoney(expenses);
+    $('fbIncome').textContent = formatMoney(income);
+    $('fbPct').textContent    = (income>0?Math.round(expenses/income*100):0)+'%';
+    const left = $('fbLeftLabel');
+    left.textContent = (balance<0?'Underskott ':'Kvar ') + formatMoney(Math.abs(balance));
+    left.className = 'fb-foot-left';
+  }
+
+  /* ---------------- Actions ---------------- */
+  function addIncome(){ currentMonth().income.push({name:'',amount:0,fixed:false}); saveDebounced(); render(); focusLastName('incomeRows'); }
+  function addExpense(){ currentMonth().expenses.push({name:'',amount:0,fixed:false}); saveDebounced(); render(); focusLastName('expenseRows'); }
+  function focusLastName(id){ const rows=$(id).querySelectorAll('.inp.name'); if(rows.length) rows[rows.length-1].focus(); }
+
+  function newMonth(){
+    const dlg = $('monthDialog');
+    $('monthInput').value = '';
+    $('copyCheck').checked = true;
+    dlg.returnValue = '';
+    dlg.showModal();
+    $('monthForm').onsubmit = (ev)=>{
+      // submitter value tells us cancel vs ok
+      const val = (ev.submitter && ev.submitter.value) || 'cancel';
+      if(val!=='ok'){ return; } // dialog closes
+      const key = $('monthInput').value; // YYYY-MM
+      if(!/^\d{4}-\d{2}$/.test(key)){ ev.preventDefault(); toast('warn','Ogiltig månad'); return; }
+      if(state.months[key]){ ev.preventDefault(); toast('warn','Månaden finns redan'); return; }
+      state.months[key] = $('copyCheck').checked
+        ? JSON.parse(JSON.stringify(currentMonth()))
+        : { income:[], expenses:[] };
+      state.currentMonth = key;
+      saveDebounced(); render();
+      toast('ok','Skapade '+monthLabel(key));
+    };
+  }
+
+  function deleteMonth(key){
+    if(Object.keys(state.months).length<=1){ toast('warn','Du måste ha minst en månad'); return; }
+    showConfirm('Ta bort månad', `Vill du ta bort ${monthLabel(key)}? Detta går inte att ångra.`, ()=>{
+      delete state.months[key];
+      if(state.currentMonth===key) state.currentMonth = Object.keys(state.months).sort().reverse()[0];
+      saveDebounced(); render();
+      toast('ok','Tog bort '+monthLabel(key));
+    });
+  }
+
+  function showConfirm(title, text, onOk){
+    const dlg = $('confirmDialog');
+    $('confirmTitle').textContent = title;
+    $('confirmText').textContent = text;
+    dlg.showModal();
+    dlg.querySelector('form').onsubmit = (ev)=>{
+      if(ev.submitter && ev.submitter.value==='ok') onOk();
+    };
+  }
+
+  /* ---------------- Theme ---------------- */
+  function toggleTheme(){
+    state.theme = state.theme==='light' ? 'dark' : state.theme==='dark' ? 'auto' : 'light';
+    saveDebounced(); applyTheme();
+    toast('ok','Tema: '+({light:'ljust',dark:'mörkt',auto:'auto'}[state.theme]));
+  }
+  function applyTheme(){
+    let t = state.theme || 'auto';
+    if(t==='auto') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', t);
+  }
+
+  /* ---------------- File handle (persisted in IndexedDB) ---------------- */
+  const IDB = { name:'budgetApp', store:'handles', key:'fileHandle' };
+  function idb(){
+    return new Promise((res,rej)=>{
+      const r = indexedDB.open(IDB.name,1);
+      r.onupgradeneeded = ()=> r.result.createObjectStore(IDB.store);
+      r.onsuccess = ()=> res(r.result);
+      r.onerror = ()=> rej(r.error);
+    });
+  }
+  async function idbSet(v){ const db=await idb(); return new Promise((res,rej)=>{ const tx=db.transaction(IDB.store,'readwrite'); tx.objectStore(IDB.store).put(v,IDB.key); tx.oncomplete=res; tx.onerror=()=>rej(tx.error); }); }
+  async function idbGet(){ const db=await idb(); return new Promise((res,rej)=>{ const tx=db.transaction(IDB.store,'readonly'); const rq=tx.objectStore(IDB.store).get(IDB.key); rq.onsuccess=()=>res(rq.result); rq.onerror=()=>rej(rq.error); }); }
+  async function idbClear(){ const db=await idb(); return new Promise((res,rej)=>{ const tx=db.transaction(IDB.store,'readwrite'); tx.objectStore(IDB.store).delete(IDB.key); tx.oncomplete=res; tx.onerror=()=>rej(tx.error); }); }
+
+  function setStorageStatus(level, name, hint){
+    const dot=$('storeDot'); dot.className='dot'+(level==='ok'?' ok':level==='warn'?' warn':'');
+    $('storeName').textContent = name || 'Inte kopplad';
+    if(hint) $('storeHint').innerHTML = hint;
+    $('connectBtn').textContent = fileHandle ? 'Byt fil…' : 'Koppla fil…';
+  }
+
+  async function verifyPermission(handle, write){
+    const opts = { mode: write?'readwrite':'read' };
+    if((await handle.queryPermission(opts))==='granted') return true;
+    if((await handle.requestPermission(opts))==='granted') return true;
+    return false;
+  }
+
+  // Let the user pick/create budget.json. Reads it if it has content, else writes current state.
+  async function connectFile(){
+    if(!window.showOpenFilePicker){
+      // Fallback for browsers without File System Access API: download + manual import
+      fallbackExport();
+      return;
+    }
+    try{
+      const [handle] = await window.showOpenFilePicker({
+        types:[{description:'JSON', accept:{'application/json':['.json']}}],
+        multiple:false
+      });
+      if(!(await verifyPermission(handle, true))){ toast('warn','Behörighet nekades'); return; }
+      fileHandle = handle;
+      await idbSet(handle);
+      const file = await handle.getFile();
+      const text = (await file.text()).trim();
+      if(text){
+        if(loadFromJson(text)){ toast('ok','Läste in '+handle.name); }
+      }else{
+        await saveAll(); toast('ok','Kopplade '+handle.name);
+      }
+      setStorageStatus('ok', handle.name, 'Sparas automatiskt');
+      render();
+    }catch(e){
+      if(e && e.name==='AbortError') return;
+      console.warn(e); toast('warn','Kunde inte koppla filen');
+    }
+  }
+
+  // On startup, try to silently re-use a previously connected file.
+  async function restoreFile(){
+    if(!window.showOpenFilePicker) { setStorageStatus('', 'Lokalt (denna webbläsare)', 'Filkoppling stöds ej i denna webbläsare'); return; }
+    try{
+      const handle = await idbGet();
+      if(!handle) { setStorageStatus('', 'Inte kopplad'); return; }
+      const perm = await handle.queryPermission({mode:'readwrite'});
+      if(perm==='granted'){
+        fileHandle = handle;
+        const file = await handle.getFile();
+        const text = (await file.text()).trim();
+        if(text) loadFromJson(text);
+        setStorageStatus('ok', handle.name, 'Sparas automatiskt');
+        render();
+      }else{
+        // needs a user gesture to re-grant; offer reconnect
+        setStorageStatus('warn', handle.name, 'Klicka för att återansluta');
+        $('connectBtn').textContent = 'Återanslut '+handle.name;
+        $('connectBtn').onclick = async ()=>{
+          if(await verifyPermission(handle, true)){
+            fileHandle = handle;
+            const file = await handle.getFile();
+            const text=(await file.text()).trim();
+            if(text) loadFromJson(text);
+            setStorageStatus('ok', handle.name, 'Sparas automatiskt');
+            $('connectBtn').onclick = connectFile;
+            render(); toast('ok','Återansluten');
+          }
+        };
+      }
+    }catch(e){ console.warn('restoreFile', e); setStorageStatus('', 'Inte kopplad'); }
+  }
+
+  function loadFromJson(text){
+    try{
+      const obj = JSON.parse(text);
+      if(!obj.months || typeof obj.months!=='object'){ toast('warn','Ogiltig fil (saknar months)'); return false; }
+      state.months = obj.months;
+      state.currentMonth = obj.currentMonth && obj.months[obj.currentMonth]
+        ? obj.currentMonth : Object.keys(obj.months).sort().reverse()[0];
+      if(obj.theme) state.theme = obj.theme;
+      if(obj._meta) state._meta = obj._meta;
+      persistLocal();
+      return true;
+    }catch(e){ toast('warn','Kunde inte läsa filen'); return false; }
+  }
+
+  // Manual export — works in every browser (incl. iOS). Download budget.json,
+  // then save it back to OneDrive via the share sheet / Save dialog.
+  function exportFile(){
+    const blob = new Blob([JSON.stringify(state,null,2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href=url; a.download='budget.json';
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    toast('ok','Laddade ner budget.json');
+  }
+  const fallbackExport = exportFile;
+
+  // Manual import — works everywhere. Pick a budget.json (e.g. from OneDrive).
+  function importFile(){ $('importInput').value=''; $('importInput').click(); }
+  function onImportPicked(){
+    const f = $('importInput').files[0];
+    if(!f) return;
+    const reader = new FileReader();
+    reader.onload = ()=>{ if(loadFromJson(reader.result)){ render(); toast('ok','Importerade '+f.name); } };
+    reader.readAsText(f);
+  }
+
+  /* ---------------- Toast ---------------- */
+  function toast(level, msg){
+    const t = document.createElement('div'); t.className='toast';
+    const d = document.createElement('span'); d.className='dot '+(level==='warn'?'warn':'ok');
+    const s = document.createElement('span'); s.textContent=msg;
+    t.append(d,s); $('toasts').appendChild(t);
+    setTimeout(()=>{ t.style.opacity='0'; t.style.transition='opacity .3s'; setTimeout(()=>t.remove(),300); }, 2600);
+  }
+
+  /* ---------------- Wire up ---------------- */
+  $('addIncomeBtn').addEventListener('click', addIncome);
+  $('addExpenseBtn').addEventListener('click', addExpense);
+  $('newMonthBtn').addEventListener('click', newMonth);
+  $('toggleThemeBtn').addEventListener('click', toggleTheme);
+  $('connectBtn').onclick = connectFile;
+  $('exportBtn').addEventListener('click', exportFile);
+  $('importBtn').addEventListener('click', importFile);
+  $('importInput').addEventListener('change', onImportPicked);
+
+  // Auto-save to a connected file only exists where the File System Access API does.
+  if(window.showOpenFilePicker) $('connectBtn').style.display = '';
+
+  window.addEventListener('keydown', (e)=>{
+    if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='s'){ e.preventDefault(); saveAll().then(()=>toast('ok','Sparat')); }
+  });
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', ()=>{ if((state.theme||'auto')==='auto') applyTheme(); });
+
+  render();
+  restoreFile();
+});
+</script>
+</body>
+</html>
