@@ -239,6 +239,9 @@ body{
 }
 .drag-handle:hover{color:var(--muted);background:var(--card-2)}
 .drag-handle:active{cursor:grabbing}
+/* while dragging: no text selection / iOS callout anywhere, and rows ignore the pointer */
+body.dragging-active{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;cursor:grabbing}
+body.dragging-active .inp{pointer-events:none}
 .inp{
   width:100%;padding:9px 11px;border-radius:var(--radius-sm);border:1px solid transparent;
   background:transparent;color:var(--text);font:inherit;transition:border-color .12s,background .12s;
@@ -633,9 +636,11 @@ document.addEventListener('DOMContentLoaded', () => {
   // Drag-to-reorder via pointer events (works with mouse and touch/iOS).
   function attachDrag(handle, wrap, type){
     handle.addEventListener('pointerdown', (e)=>{
+      if(e.button != null && e.button !== 0) return; // primary button / touch only
       e.preventDefault();
       const container = wrap.parentElement;
       try{ handle.setPointerCapture(e.pointerId); }catch(_){}
+      document.body.classList.add('dragging-active'); // kills text selection globally
       wrap.classList.add('dragging');
 
       const move = (ev)=>{
@@ -648,17 +653,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if(!placed) container.appendChild(wrap);
       };
-      const up = (ev)=>{
-        try{ handle.releasePointerCapture(ev.pointerId); }catch(_){}
-        handle.removeEventListener('pointermove', move);
-        handle.removeEventListener('pointerup', up);
-        handle.removeEventListener('pointercancel', up);
+      const up = ()=>{
+        // Listen on document, not the handle, so moves keep tracking once the
+        // pointer leaves the small handle.
+        document.removeEventListener('pointermove', move);
+        document.removeEventListener('pointerup', up);
+        document.removeEventListener('pointercancel', up);
+        document.body.classList.remove('dragging-active');
         wrap.classList.remove('dragging');
         commitOrder(type, container);
       };
-      handle.addEventListener('pointermove', move);
-      handle.addEventListener('pointerup', up);
-      handle.addEventListener('pointercancel', up);
+      document.addEventListener('pointermove', move);
+      document.addEventListener('pointerup', up);
+      document.addEventListener('pointercancel', up);
     });
   }
 
