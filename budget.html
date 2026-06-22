@@ -312,6 +312,19 @@ dialog::backdrop{background:rgba(10,15,29,.45);backdrop-filter:blur(2px)}
 .dlg-check input{width:16px;height:16px;accent-color:var(--accent)}
 .dlg-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}
 
+/* ---------- Browse (locked) vs edit mode ---------- */
+#editToggle{flex:none;align-self:center;white-space:nowrap}
+#editToggle.on{background:var(--accent);color:var(--on-accent);border-color:transparent}
+/* In locked mode the edit affordances disappear and rows read as a clean list */
+.container.locked .drag-handle,
+.container.locked .row-del,
+.container.locked .add-row,
+.container.locked .add-sub,
+.container.locked .mchip.add,
+.container.locked .mc-del{display:none}
+.container.locked .row{grid-template-columns:1fr 132px}
+.container.locked .inp{pointer-events:none;background:transparent;border-color:transparent;cursor:default}
+
 /* ---------- Responsive ---------- */
 @media (max-width:920px){
   /* header on top, budget in the middle, OneDrive on its own at the bottom */
@@ -331,6 +344,7 @@ dialog::backdrop{background:rgba(10,15,29,.45);backdrop-filter:blur(2px)}
   .top-cards{grid-template-columns:1fr}
   .col-head{display:none}
   .row{grid-template-columns:20px 1fr 96px 30px;gap:7px}
+  .container.locked .row{grid-template-columns:1fr 96px}
   .item-bar{display:none}
   .mchip{min-width:130px}
 }
@@ -359,6 +373,7 @@ dialog::backdrop{background:rgba(10,15,29,.45);backdrop-filter:blur(2px)}
         <h2 id="monthTitle">—</h2>
         <div class="sub" id="monthSub"></div>
       </div>
+      <button class="btn ghost sm" id="editToggle" type="button">✎ Redigera</button>
     </div>
 
     <section class="top-cards" aria-label="Summering">
@@ -907,6 +922,17 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
+  /* ---------------- Browse vs edit mode ---------------- */
+  // Default: edit on desktop, locked (read-only browsing) on mobile to avoid
+  // accidental "fetfingerklick" while scanning the budget.
+  let editMode = !matchMedia('(max-width:920px)').matches;
+  function applyEditMode(){
+    $('app').classList.toggle('locked', !editMode);
+    const b = $('editToggle');
+    b.textContent = editMode ? '✓ Klar' : '✎ Redigera';
+    b.classList.toggle('on', editMode);
+  }
+
   /* ---------------- Theme (always follows the system setting) ---------------- */
   function applyTheme(){
     const dark = matchMedia('(prefers-color-scheme: dark)').matches;
@@ -1054,6 +1080,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('addIncomeGroupBtn').addEventListener('click', ()=>addGroup('income'));
   $('addExpenseGroupBtn').addEventListener('click', ()=>addGroup('expense'));
   $('onedriveBtn').onclick = signInOneDrive;
+  $('editToggle').addEventListener('click', ()=>{ editMode=!editMode; applyEditMode(); });
 
   window.addEventListener('keydown', (e)=>{
     if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='s'){ e.preventDefault(); saveAll().then(()=>toast('ok','Sparat')); }
@@ -1065,6 +1092,7 @@ document.addEventListener('DOMContentLoaded', () => {
   else if(mq.addListener) mq.addListener(applyTheme);
 
   render();
+  applyEditMode();
   initOneDrive();
 });
 </script>
