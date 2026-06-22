@@ -73,7 +73,7 @@ body{
   overflow-x:hidden;
 }
 /* Overflow-proofing: let grid/flex children shrink below their content width */
-.container,.sidebar,.main,.section,.card,.flowbar,.top-cards,.row,.item,.month-nav{min-width:0}
+.container,.side-card,.main,.section,.card,.flowbar,.top-cards,.row,.item,.month-nav{min-width:0}
 .row>*,.inp{min-width:0;max-width:100%}
 
 /* ---------- Layout ---------- */
@@ -82,20 +82,25 @@ body{
   margin:0 auto;
   display:grid;
   grid-template-columns:290px 1fr;
+  grid-template-rows:auto 1fr;
+  grid-template-areas:
+    "brand main"
+    "od    main";
   gap:var(--gap);
   align-items:start;
 }
 
-/* ---------- Sidebar ---------- */
-.sidebar{
-  position:sticky; top:22px;
+/* ---------- Side cards (brand header + OneDrive panel) ---------- */
+.side-card{
   background:var(--card);
   border:1px solid var(--border);
   border-radius:var(--radius);
   padding:18px;
   box-shadow:var(--shadow);
-  display:flex; flex-direction:column; gap:16px;
 }
+.brand-card{grid-area:brand; position:sticky; top:22px}
+.od-card{grid-area:od; align-self:start; display:flex; flex-direction:column; gap:8px}
+.main{grid-area:main}
 .brand{display:flex;align-items:center;gap:12px}
 .logo{
   width:42px;height:42px;border-radius:12px;
@@ -103,10 +108,8 @@ body{
   display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:17px;
   box-shadow:0 4px 12px rgba(58,109,208,.32);
 }
-.brand h1{font-size:1.06rem;font-weight:700;letter-spacing:-.01em}
-.brand .muted{font-size:.82rem}
+.brand h1{font-size:1.5rem;font-weight:800;letter-spacing:-.02em}
 
-.side-section{display:flex;flex-direction:column;gap:8px}
 .side-label{
   font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);
   display:flex;justify-content:space-between;align-items:center;
@@ -173,7 +176,7 @@ body{
 /* ---------- Main ---------- */
 .main{display:flex;flex-direction:column;gap:var(--gap)}
 .page-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap}
-.page-head h2{font-size:1.5rem;font-weight:800;letter-spacing:-.02em}
+.page-head h2{font-size:2.4rem;font-weight:800;letter-spacing:-.03em;line-height:1.1}
 .page-head .sub{color:var(--muted);font-size:.9rem;margin-top:2px}
 
 /* Summary cards */
@@ -264,9 +267,9 @@ body.dragging-active .inp{pointer-events:none}
 .add-row{padding:6px 0 10px;display:flex;gap:8px;flex-wrap:wrap}
 .add-row .btn{font-size:.88rem}
 /* groups (e.g. "Lån" with sub-entries) */
-.name-cell{display:flex;align-items:center;gap:4px;min-width:0}
-.chevron{flex:0 0 auto;width:20px;height:30px;display:flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;color:var(--muted);font-size:11px;border-radius:6px;transition:transform .15s,color .15s,background .15s}
-.chevron:hover{background:var(--card-2);color:var(--text)}
+.name-cell{display:flex;align-items:center;gap:2px;min-width:0}
+.chevron{flex:0 0 auto;width:15px;height:30px;display:flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;color:var(--faint);font-size:9px;transition:transform .15s,color .15s}
+.chevron:hover{color:var(--accent)}
 .item.group.collapsed .chevron{transform:rotate(-90deg)}
 .group-total{align-self:center;text-align:right;padding-right:10px;font-weight:600;color:var(--text);font-variant-numeric:tabular-nums}
 .group-children{margin:2px 0 2px 11px;padding-left:11px;border-left:2px solid var(--border)}
@@ -285,6 +288,9 @@ body.dragging-active .inp{pointer-events:none}
   animation:slidein .2s ease;
 }
 .toast .dot{width:9px;height:9px}
+.toast .toast-msg{flex:1}
+.toast-undo{flex:none;background:none;border:none;color:var(--accent);font-weight:700;font-size:.88rem;cursor:pointer;padding:4px 8px;margin-left:4px;border-radius:6px}
+.toast-undo:hover{background:var(--accent-soft)}
 @keyframes slidein{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 
 /* Dialog */
@@ -308,8 +314,17 @@ dialog::backdrop{background:rgba(10,15,29,.45);backdrop-filter:blur(2px)}
 
 /* ---------- Responsive ---------- */
 @media (max-width:920px){
-  .container{grid-template-columns:1fr}
-  .sidebar{position:static;top:auto}
+  /* header on top, budget in the middle, OneDrive on its own at the bottom */
+  .container{
+    grid-template-columns:1fr;
+    grid-template-rows:none;
+    grid-template-areas:"brand" "main" "od";
+  }
+  .brand-card{position:static;top:auto}
+  /* let the title grow with the viewport to fill the top */
+  .brand{gap:16px}
+  .brand h1{font-size:clamp(1.9rem,9vw,2.7rem);line-height:1.05}
+  .logo{width:54px;height:54px;border-radius:14px;font-size:21px}
 }
 @media (max-width:560px){
   body{padding:12px}
@@ -325,25 +340,13 @@ dialog::backdrop{background:rgba(10,15,29,.45);backdrop-filter:blur(2px)}
 <body>
 <div id="app" class="container" role="application" aria-label="Familjebudget">
 
-  <!-- Sidebar -->
-  <aside class="sidebar">
+  <!-- Brand header -->
+  <header class="side-card brand-card">
     <div class="brand">
       <div class="logo" aria-hidden="true">FB</div>
-      <div>
-        <h1>Familjebudget</h1>
-        <div class="muted">Planera era månader</div>
-      </div>
+      <h1>Familjebudget</h1>
     </div>
-
-    <div class="side-section">
-      <div class="side-label"><span>OneDrive</span></div>
-      <div class="storage">
-        <div class="st-row"><span class="dot" id="odDot"></span><span class="st-name" id="odName">Inte inloggad</span></div>
-        <div id="odHint" style="font-size:.76rem">Logga in för automatisk synk på alla enheter.</div>
-        <button class="btn ghost sm block" id="onedriveBtn" type="button">☁ Logga in med OneDrive</button>
-      </div>
-    </div>
-  </aside>
+  </header>
 
   <!-- Main -->
   <main class="main" role="main">
@@ -406,6 +409,16 @@ dialog::backdrop{background:rgba(10,15,29,.45);backdrop-filter:blur(2px)}
       <div class="add-row"><button class="btn ghost sm" id="addExpenseBtn" type="button">+ Lägg till utgift</button><button class="btn ghost sm" id="addExpenseGroupBtn" type="button">+ Lägg till grupp</button></div>
     </section>
   </main>
+
+  <!-- OneDrive panel (its own card, sits at the bottom on mobile) -->
+  <aside class="side-card od-card">
+    <div class="side-label"><span>OneDrive</span></div>
+    <div class="storage">
+      <div class="st-row"><span class="dot" id="odDot"></span><span class="st-name" id="odName">Inte inloggad</span></div>
+      <div id="odHint" style="font-size:.76rem">Logga in för automatisk synk på alla enheter.</div>
+      <button class="btn ghost sm block" id="onedriveBtn" type="button">☁ Logga in med OneDrive</button>
+    </div>
+  </aside>
 </div>
 
 <div class="toasts" id="toasts" aria-live="polite"></div>
@@ -586,6 +599,17 @@ document.addEventListener('DOMContentLoaded', () => {
       requestAnimationFrame(()=> input.focus());
     }
   }
+  // Enter inside a field runs fn (used to spawn + focus the next row).
+  function onEnter(input, fn){
+    input.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); fn(); } });
+  }
+  // Insert a blank sibling right after `item` in its array and focus it.
+  function addAfter(arr, item){
+    const it = {name:'',amount:0};
+    const i = arr.indexOf(item);
+    arr.splice(i>-1 ? i+1 : arr.length, 0, it);
+    pendingFocus = it; saveDebounced(); render();
+  }
 
   function createRow(type, item, arr, totalExp, isChild){
     return isGroup(item)
@@ -626,12 +650,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const kr = document.createElement('span'); kr.className='kr'; kr.textContent='kr';
     amtWrap.appendChild(amt); amtWrap.appendChild(kr);
 
+    const addNext = ()=> addAfter(arr, item);
+    onEnter(name, addNext); onEnter(amt, addNext);
+
     const del = document.createElement('button');
     del.className='row-del'; del.type='button'; del.title='Ta bort'; del.textContent='×';
-    del.addEventListener('click', ()=>{
-      const i = arr.indexOf(item); if(i>-1) arr.splice(i,1);
-      saveDebounced(); render();
-    });
+    del.addEventListener('click', ()=> deleteItem(arr, item));
 
     row.append(handle, name, amtWrap, del);
     wrap.appendChild(row);
@@ -669,6 +693,11 @@ document.addEventListener('DOMContentLoaded', () => {
     name.className='inp name'; name.placeholder='Gruppnamn'; name.value=item.name||'';
     name.setAttribute('aria-label','Gruppnamn');
     name.addEventListener('input', e=>{ item.name=e.target.value; saveDebounced(); });
+    onEnter(name, ()=>{
+      const child = {name:'',amount:0};
+      item.children.push(child); item.collapsed = false;
+      pendingFocus = child; saveDebounced(); render();
+    });
     maybeFocus(item, name);
     nameCell.append(chev, name);
 
@@ -678,10 +707,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const del = document.createElement('button');
     del.className='row-del'; del.type='button'; del.title='Ta bort grupp'; del.textContent='×';
-    del.addEventListener('click', ()=>{
-      const i = arr.indexOf(item); if(i>-1) arr.splice(i,1);
-      saveDebounced(); render();
-    });
+    del.addEventListener('click', ()=> deleteItem(arr, item));
 
     row.append(handle, nameCell, total, del);
     wrap.appendChild(row);
@@ -816,6 +842,21 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   /* ---------------- Actions ---------------- */
+  // Remove a row/group, but offer an undo toast that restores it in place.
+  function deleteItem(arr, item){
+    const idx = arr.indexOf(item);
+    if(idx < 0) return;
+    arr.splice(idx, 1);
+    saveDebounced(); render();
+    const label = (item.name && item.name.trim())
+      ? '"' + item.name.trim() + '"'
+      : (isGroup(item) ? 'gruppen' : 'raden');
+    toastAction('Tog bort ' + label, 'Ångra', ()=>{
+      arr.splice(Math.min(idx, arr.length), 0, item); // restore at original spot
+      saveDebounced(); render();
+    });
+  }
+
   function addIncome(){ const it={name:'',amount:0}; currentMonth().income.push(it); pendingFocus=it; saveDebounced(); render(); }
   function addExpense(){ const it={name:'',amount:0}; currentMonth().expenses.push(it); pendingFocus=it; saveDebounced(); render(); }
   function addGroup(type){
@@ -980,12 +1021,31 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   /* ---------------- Toast ---------------- */
-  function toast(level, msg){
+  function buildToast(level, msg){
     const t = document.createElement('div'); t.className='toast';
     const d = document.createElement('span'); d.className='dot '+(level==='warn'?'warn':'ok');
-    const s = document.createElement('span'); s.textContent=msg;
+    const s = document.createElement('span'); s.className='toast-msg'; s.textContent=msg;
     t.append(d,s); $('toasts').appendChild(t);
-    setTimeout(()=>{ t.style.opacity='0'; t.style.transition='opacity .3s'; setTimeout(()=>t.remove(),300); }, 2600);
+    return t;
+  }
+  function dismissToast(t){
+    if(t._gone) return; t._gone=true;
+    clearTimeout(t._timer);
+    t.style.opacity='0'; t.style.transition='opacity .3s';
+    setTimeout(()=>t.remove(),300);
+  }
+  function toast(level, msg){
+    const t = buildToast(level, msg);
+    t._timer = setTimeout(()=>dismissToast(t), 2600);
+  }
+  // Toast with a tappable action (e.g. "Ångra") and a longer window to react.
+  function toastAction(msg, actionLabel, onAction){
+    const t = buildToast('ok', msg);
+    const btn = document.createElement('button');
+    btn.className='toast-undo'; btn.type='button'; btn.textContent=actionLabel;
+    btn.addEventListener('click', ()=>{ onAction(); dismissToast(t); });
+    t.appendChild(btn);
+    t._timer = setTimeout(()=>dismissToast(t), 6000);
   }
 
   /* ---------------- Wire up ---------------- */
