@@ -517,6 +517,10 @@ document.addEventListener('DOMContentLoaded', () => {
   function touch(key){ const m = state.months[key]; if(m) m.updatedAt = Date.now(); }
   function markDirty(){ touch(state.currentMonth); saveDebounced(); }
 
+  // True while the caret is in one of our editable fields — used so a background sync never
+  // re-renders the DOM out from under an active edit (which would drop focus / the keyboard).
+  function isEditing(){ const a = document.activeElement; return !!(a && a.classList && a.classList.contains('inp')); }
+
   /* ---------------- Helpers ---------------- */
   const MONTH_NAMES = ['januari','februari','mars','april','maj','juni','juli','augusti','september','oktober','november','december'];
   function monthKey(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; }
@@ -1086,35 +1090,50 @@ document.addEventListener('DOMContentLoaded', () => {
       const text = (await r.text()).trim();
       if(text){
         const cloud = JSON.parse(text);
-        if(cloud.theme) state.theme = cloud.theme;
+        if(cloud.theme && cloud.theme !== state.theme){ state.theme = cloud.theme; applyTheme(); }
+        const before = JSON.stringify(state.months);
         mergeCloud(cloud);
         persistLocal();
-        render();
+        // Only repaint if the merge actually changed something AND the user isn't mid-edit, so a
+        // background refresh never yanks the focused field or closes the mobile keyboard.
+        if(JSON.stringify(state.months) !== before && !isEditing()) render();
       }
       setOd('ok', null, 'Synkad '+timeNow());
     }catch(e){ console.warn('OneDrive-hämtning', e); setOd('warn', null, 'Synk misslyckades'); }
   }
 
-  // Read-merge-write so we never clobber a month another device changed. The conditional
-  // PUT (If-Match ETag) fails with 412 if someone wrote between our GET and PUT — then we
-  // re-read, re-merge and retry, which closes the lost-update window.
-  async function pushToOneDrive(retry=2){
-    const token = await getToken(); if(!token) return;
+  // Read-merge-write so we never clobber a month another device changed. The conditional PUT
+  // (If-Match ETag) returns 412 if someone wrote between our GET and PUT — we re-read, re-merge
+  // and retry. A single in-flight guard coalesces the rapid autosaves while typing into one push
+  // at a time (plus one trailing run with the latest state), so saves don't stack and 412-storm.
+  let pushing = false, pushQueued = false;
+  async function pushToOneDrive(){
+    if(pushing){ pushQueued = true; return; } // already saving — just note that state moved on
+    pushing = true;
     try{
-      let etag = null;
-      const g = await fetch(GRAPH_FILE, { headers:{ Authorization:'Bearer '+token } });
-      if(g.ok){
-        etag = g.headers.get('ETag');
-        const text = (await g.text()).trim();
-        if(text) mergeCloud(JSON.parse(text));
+      const token = await getToken(); if(!token) return;
+      for(let attempt = 0; attempt < 3; attempt++){
+        let etag = null;
+        const g = await fetch(GRAPH_FILE, { headers:{ Authorization:'Bearer '+token } });
+        if(g.ok){
+          etag = g.headers.get('ETag');
+          const text = (await g.text()).trim();
+          if(text) mergeCloud(JSON.parse(text));
+        }
+        const headers = { Authorization:'Bearer '+token, 'Content-Type':'application/json' };
+        if(etag) headers['If-Match'] = etag; // only write if the cloud hasn't changed since our GET
+        const r = await fetch(GRAPH_FILE, { method:'PUT', headers, body: JSON.stringify(state, null, 2) });
+        if(r.status === 412) continue; // someone beat us → re-read, re-merge, retry
+        if(!r.ok) throw new Error('PUT '+r.status);
+        persistLocal(); setOd('ok', null, 'Synkad '+timeNow());
+        return;
       }
-      const headers = { Authorization:'Bearer '+token, 'Content-Type':'application/json' };
-      if(etag) headers['If-Match'] = etag; // only write if the cloud hasn't changed since our GET
-      const r = await fetch(GRAPH_FILE, { method:'PUT', headers, body: JSON.stringify(state, null, 2) });
-      if(r.status === 412 && retry > 0) return pushToOneDrive(retry-1); // someone beat us → re-read & re-merge
-      if(!r.ok) throw new Error('PUT '+r.status);
-      persistLocal(); setOd('ok', null, 'Synkad '+timeNow());
+      setOd('warn', null, 'Kunde inte synka'); // kept colliding — give up this round
     }catch(e){ console.warn('OneDrive-sparning', e); setOd('warn', null, 'Kunde inte synka'); }
+    finally{
+      pushing = false;
+      if(pushQueued){ pushQueued = false; pushToOneDrive(); } // flush the latest state once more
+    }
   }
 
   /* ---------------- Toast ---------------- */
@@ -1166,7 +1185,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // pull the latest when you return so you actually see the other device's changes.
   document.addEventListener('visibilitychange', ()=>{
     if(document.hidden) saveDebounced.flush();
-    else if(pca && msAccount) pullFromOneDrive();
+    else if(pca && msAccount && !isEditing()) pullFromOneDrive(); // don't refresh on top of an active edit
   });
   window.addEventListener('pagehide', ()=> saveDebounced.flush());
 
