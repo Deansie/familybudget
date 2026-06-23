@@ -1053,7 +1053,12 @@ document.addEventListener('DOMContentLoaded', () => {
     for(const k in local){
       const l = local[k], c = cloud[k];
       if(c){
-        if((l.updatedAt||0) > (c.updatedAt||0)) out[k] = l; // local strictly newer → local wins
+        const ln = l.updatedAt||0, cn = c.updatedAt||0;
+        // Local wins when strictly newer, OR on a tie if it's a real month. The tie case matters
+        // for object identity: the DOM's edit handlers close over the live month/child objects, so
+        // replacing them with a fresh cloud clone (e.g. right after our own push, when local==cloud)
+        // would orphan an in-progress edit — it'd never reach state/cloud and vanish on next render.
+        if(ln > cn || (ln === cn && monthHasData(l))) out[k] = l;
       } else if(monthHasData(l)){
         out[k] = l; // cloud lacks it → keep only a real local month, not the empty template
       }
