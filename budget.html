@@ -506,7 +506,16 @@ document.addEventListener('DOMContentLoaded', () => {
     if(pca && msAccount) pushToOneDrive(); // fire-and-forget cloud sync
   }
 
-  function debounce(fn, wait){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),wait); }; }
+  function debounce(fn, wait){
+    let t;
+    const d = (...a)=>{ clearTimeout(t); t=setTimeout(()=>{ t=null; fn(...a); }, wait); };
+    d.flush = ()=>{ if(t){ clearTimeout(t); t=null; fn(); } }; // run a pending save right now
+    return d;
+  }
+
+  // Stamp the month being edited so multi-device merges keep the newest copy of each month.
+  function touch(key){ const m = state.months[key]; if(m) m.updatedAt = Date.now(); }
+  function markDirty(){ touch(state.currentMonth); saveDebounced(); }
 
   /* ---------------- Helpers ---------------- */
   const MONTH_NAMES = ['januari','februari','mars','april','maj','juni','juli','augusti','september','oktober','november','december'];
@@ -623,7 +632,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const it = {name:'',amount:0};
     const i = arr.indexOf(item);
     arr.splice(i>-1 ? i+1 : arr.length, 0, it);
-    pendingFocus = it; saveDebounced(); render();
+    pendingFocus = it; markDirty(); render();
   }
 
   function createRow(type, item, arr, totalExp, isChild){
@@ -646,7 +655,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const name = document.createElement('input');
     name.className='inp name'; name.placeholder='Namn'; name.value=item.name||'';
     name.setAttribute('aria-label','Namn');
-    name.addEventListener('input', e=>{ item.name=e.target.value; saveDebounced(); });
+    name.addEventListener('input', e=>{ item.name=e.target.value; markDirty(); });
     maybeFocus(item, name);
 
     const amtWrap = document.createElement('div'); amtWrap.className='amt-wrap';
@@ -661,7 +670,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     amt.value = (item.amount!=null && item.amount!==0) ? item.amount : '';
     amt.setAttribute('aria-label','Belopp');
-    amt.addEventListener('input', e=>{ item.amount=Number(e.target.value)||0; liveRefresh(); saveDebounced(); });
+    amt.addEventListener('input', e=>{ item.amount=Number(e.target.value)||0; liveRefresh(); markDirty(); });
     const kr = document.createElement('span'); kr.className='kr'; kr.textContent='kr';
     amtWrap.appendChild(amt); amtWrap.appendChild(kr);
 
@@ -707,11 +716,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const name = document.createElement('input');
     name.className='inp name'; name.placeholder='Gruppnamn'; name.value=item.name||'';
     name.setAttribute('aria-label','Gruppnamn');
-    name.addEventListener('input', e=>{ item.name=e.target.value; saveDebounced(); });
+    name.addEventListener('input', e=>{ item.name=e.target.value; markDirty(); });
     onEnter(name, ()=>{
       const child = {name:'',amount:0};
       item.children.push(child); item.collapsed = false;
-      pendingFocus = child; saveDebounced(); render();
+      pendingFocus = child; markDirty(); render();
     });
     maybeFocus(item, name);
     nameCell.append(chev, name);
@@ -740,7 +749,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const child = {name:'',amount:0};
       item.children.push(child); pendingFocus = child;
       item.collapsed = false;
-      saveDebounced(); render();
+      markDirty(); render();
     });
     addWrap.appendChild(addBtn);
     wrap.appendChild(addWrap);
@@ -803,7 +812,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if(!arr) return;
     const newArr = Array.from(container.querySelectorAll(':scope > .item')).map(n=>n._item).filter(Boolean);
     arr.length = 0; arr.push.apply(arr, newArr);
-    saveDebounced(); render();
+    markDirty(); render();
   }
 
   // Lightweight refresh during typing: group subtotals, totals, and bars.
@@ -861,23 +870,24 @@ document.addEventListener('DOMContentLoaded', () => {
   function deleteItem(arr, item){
     const idx = arr.indexOf(item);
     if(idx < 0) return;
+    const mk = state.currentMonth; // stamp this month on both delete and undo, even if you switch months meanwhile
     arr.splice(idx, 1);
-    saveDebounced(); render();
+    touch(mk); saveDebounced(); render();
     const label = (item.name && item.name.trim())
       ? '"' + item.name.trim() + '"'
       : (isGroup(item) ? 'gruppen' : 'raden');
     toastAction('Tog bort ' + label, 'Ångra', ()=>{
       arr.splice(Math.min(idx, arr.length), 0, item); // restore at original spot
-      saveDebounced(); render();
+      touch(mk); saveDebounced(); render();
     });
   }
 
-  function addIncome(){ const it={name:'',amount:0}; currentMonth().income.push(it); pendingFocus=it; saveDebounced(); render(); }
-  function addExpense(){ const it={name:'',amount:0}; currentMonth().expenses.push(it); pendingFocus=it; saveDebounced(); render(); }
+  function addIncome(){ const it={name:'',amount:0}; currentMonth().income.push(it); pendingFocus=it; markDirty(); render(); }
+  function addExpense(){ const it={name:'',amount:0}; currentMonth().expenses.push(it); pendingFocus=it; markDirty(); render(); }
   function addGroup(type){
     const g = {name:'', children:[{name:'',amount:0}], collapsed:false};
     (type==='income' ? currentMonth().income : currentMonth().expenses).push(g);
-    pendingFocus = g; saveDebounced(); render();
+    pendingFocus = g; markDirty(); render();
   }
 
   function newMonth(){
@@ -897,7 +907,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ? JSON.parse(JSON.stringify(currentMonth()))
         : { income:[], expenses:[] };
       state.currentMonth = key;
-      saveDebounced(); render();
+      markDirty(); render(); // markDirty stamps the new month with a fresh updatedAt
       toast('ok','Skapade '+monthLabel(key));
     };
   }
@@ -905,6 +915,8 @@ document.addEventListener('DOMContentLoaded', () => {
   function deleteMonth(key){
     if(Object.keys(state.months).length<=1){ toast('warn','Du måste ha minst en månad'); return; }
     showConfirm('Ta bort månad', `Vill du ta bort ${monthLabel(key)}? Detta går inte att ångra.`, ()=>{
+      state.deletedMonths = state.deletedMonths || {};
+      state.deletedMonths[key] = Date.now(); // tombstone: keeps the month from resurrecting via the other device's copy
       delete state.months[key];
       if(state.currentMonth===key) state.currentMonth = Object.keys(state.months).sort().reverse()[0];
       saveDebounced(); render();
@@ -1018,8 +1030,42 @@ document.addEventListener('DOMContentLoaded', () => {
     pca.logoutRedirect({ account: msAccount, postLogoutRedirectUri: msalConfig.auth.redirectUri });
   }
 
-  // On login/startup OneDrive is the source of truth: load the cloud copy into local.
-  // Only when no cloud file exists yet (first run) do we seed it from whatever is local.
+  /* --- Per-month merge so two devices don't overwrite each other's months --- */
+  // Tombstones: keep the newest delete-time per month key from either side.
+  function mergeTombstones(a, b){
+    const out = { ...(b||{}) };
+    const x = a || {};
+    for(const k in x) out[k] = Math.max(out[k]||0, x[k]);
+    return out;
+  }
+  // Newest updatedAt wins per month; local wins ties (so an edit in progress isn't lost).
+  function mergeMonths(local, cloud, tombstones){
+    const out = { ...cloud };
+    for(const k in local){
+      if(!cloud[k] || (local[k].updatedAt||0) >= (cloud[k].updatedAt||0)) out[k] = local[k];
+    }
+    if(tombstones){
+      for(const k in tombstones){
+        if(out[k] && (out[k].updatedAt||0) <= tombstones[k]) delete out[k]; // dropped by a newer delete elsewhere
+      }
+    }
+    return out;
+  }
+  // Fold a freshly-read cloud copy into local state (months + tombstones).
+  function mergeCloud(cloud){
+    if(!cloud || !cloud.months) return;
+    state.deletedMonths = mergeTombstones(state.deletedMonths, cloud.deletedMonths);
+    state.months = mergeMonths(state.months, cloud.months, state.deletedMonths);
+    ensureCurrentMonthValid();
+  }
+  function ensureCurrentMonthValid(){
+    const keys = Object.keys(state.months);
+    if(!keys.length){ const k = monthKey(new Date()); state.months[k] = { income:[], expenses:[] }; state.currentMonth = k; return; }
+    if(!state.months[state.currentMonth]) state.currentMonth = keys.sort().reverse()[0];
+  }
+
+  // Pull merges the cloud copy into local (per-month newest wins) rather than overwriting,
+  // so an edit made here since the last sync survives. First run (404) seeds cloud from local.
   async function pullFromOneDrive(){
     const token = await getToken(); if(!token) return;
     setOd('ok', null, 'Hämtar…');
@@ -1028,21 +1074,36 @@ document.addEventListener('DOMContentLoaded', () => {
       if(r.status === 404){ await pushToOneDrive(); return; } // first run → seed cloud from local
       if(!r.ok) throw new Error('GET '+r.status);
       const text = (await r.text()).trim();
-      if(text && loadFromJson(text)) render(); // cloud wins
+      if(text){
+        const cloud = JSON.parse(text);
+        if(cloud.theme) state.theme = cloud.theme;
+        mergeCloud(cloud);
+        persistLocal();
+        render();
+      }
       setOd('ok', null, 'Synkad '+timeNow());
     }catch(e){ console.warn('OneDrive-hämtning', e); setOd('warn', null, 'Synk misslyckades'); }
   }
 
-  async function pushToOneDrive(){
+  // Read-merge-write so we never clobber a month another device changed. The conditional
+  // PUT (If-Match ETag) fails with 412 if someone wrote between our GET and PUT — then we
+  // re-read, re-merge and retry, which closes the lost-update window.
+  async function pushToOneDrive(retry=2){
     const token = await getToken(); if(!token) return;
     try{
-      const r = await fetch(GRAPH_FILE, {
-        method:'PUT',
-        headers:{ Authorization:'Bearer '+token, 'Content-Type':'application/json' },
-        body: JSON.stringify(state, null, 2)
-      });
+      let etag = null;
+      const g = await fetch(GRAPH_FILE, { headers:{ Authorization:'Bearer '+token } });
+      if(g.ok){
+        etag = g.headers.get('ETag');
+        const text = (await g.text()).trim();
+        if(text) mergeCloud(JSON.parse(text));
+      }
+      const headers = { Authorization:'Bearer '+token, 'Content-Type':'application/json' };
+      if(etag) headers['If-Match'] = etag; // only write if the cloud hasn't changed since our GET
+      const r = await fetch(GRAPH_FILE, { method:'PUT', headers, body: JSON.stringify(state, null, 2) });
+      if(r.status === 412 && retry > 0) return pushToOneDrive(retry-1); // someone beat us → re-read & re-merge
       if(!r.ok) throw new Error('PUT '+r.status);
-      setOd('ok', null, 'Synkad '+timeNow());
+      persistLocal(); setOd('ok', null, 'Synkad '+timeNow());
     }catch(e){ console.warn('OneDrive-sparning', e); setOd('warn', null, 'Kunde inte synka'); }
   }
 
@@ -1090,6 +1151,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const mq = matchMedia('(prefers-color-scheme: dark)');
   if(mq.addEventListener) mq.addEventListener('change', applyTheme);
   else if(mq.addListener) mq.addListener(applyTheme);
+
+  // Multi-device freshness: flush a pending save before the tab is hidden/closed, and
+  // pull the latest when you return so you actually see the other device's changes.
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.hidden) saveDebounced.flush();
+    else if(pca && msAccount) pullFromOneDrive();
+  });
+  window.addEventListener('pagehide', ()=> saveDebounced.flush());
 
   render();
   applyEditMode();
