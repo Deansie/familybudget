@@ -1038,11 +1038,21 @@ document.addEventListener('DOMContentLoaded', () => {
     for(const k in x) out[k] = Math.max(out[k]||0, x[k]);
     return out;
   }
-  // Newest updatedAt wins per month; local wins ties (so an edit in progress isn't lost).
+  // A month is "real" (worth syncing) once an edit has stamped it or it has any rows. A freshly
+  // fabricated empty current-month template (updatedAt 0, no rows) is NOT — so it must never
+  // overwrite or seed the cloud (e.g. logging in fresh shouldn't wipe real cloud data).
+  function monthHasData(m){ return !!m && ((m.updatedAt||0) > 0 || (m.income && m.income.length) || (m.expenses && m.expenses.length)); }
+  // Newest updatedAt wins per month. Cloud wins ties, and an unstamped local month never clobbers
+  // the cloud — a genuine edit always stamps updatedAt=now, so it's strictly newer and still wins.
   function mergeMonths(local, cloud, tombstones){
     const out = { ...cloud };
     for(const k in local){
-      if(!cloud[k] || (local[k].updatedAt||0) >= (cloud[k].updatedAt||0)) out[k] = local[k];
+      const l = local[k], c = cloud[k];
+      if(c){
+        if((l.updatedAt||0) > (c.updatedAt||0)) out[k] = l; // local strictly newer → local wins
+      } else if(monthHasData(l)){
+        out[k] = l; // cloud lacks it → keep only a real local month, not the empty template
+      }
     }
     if(tombstones){
       for(const k in tombstones){
