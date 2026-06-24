@@ -1,4 +1,4 @@
-# Familjebudget
+# Familybudget
 
 A small, self-contained web app for planning a household budget one month at a time:
 enter your income and expenses, group related items together, and see your balance,
