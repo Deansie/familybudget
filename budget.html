@@ -537,6 +537,8 @@ document.addEventListener('DOMContentLoaded', () => {
   function isGroup(it){ return it && Array.isArray(it.children); }
   function itemAmount(it){ return isGroup(it) ? it.children.reduce((s,c)=>s+itemAmount(c),0) : (Number(it.amount)||0); }
   function sum(arr){ return arr.reduce((s,i)=>s+itemAmount(i),0); }
+  // Count actual line items: a group isn't a post itself, so count its children (recursively).
+  function countLeaves(arr){ return arr.reduce((n,it)=> n + (isGroup(it) ? countLeaves(it.children) : 1), 0); }
   function monthBalance(key){ const m=state.months[key]; return m ? sum(m.income)-sum(m.expenses) : 0; }
 
   /* ---------------- Render ---------------- */
@@ -590,8 +592,8 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderHead(){
     $('monthTitle').textContent = monthLabel(state.currentMonth);
     const m = currentMonth();
-    const n = m.income.length + m.expenses.length;
-    $('monthSub').textContent = n ? `${m.income.length} intäkter · ${m.expenses.length} utgifter` : 'Inga poster ännu';
+    const inc = countLeaves(m.income), exp = countLeaves(m.expenses);
+    $('monthSub').textContent = (inc + exp) ? `${inc} intäkter · ${exp} utgifter` : 'Inga poster ännu';
   }
 
   function renderRows(){
