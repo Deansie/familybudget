@@ -8,7 +8,7 @@ It is a single static page with no backend, no framework, and no build step. You
 lives in your own OneDrive and syncs across devices when you sign in with a personal
 Microsoft account. The interface is in Swedish.
 
-**Live demo:** https://deansie.github.io/familybudget/
+**Live demo:** https://deansie.github.io/familybudget/ (interface preview — sign-in and sync are tied to this personal deployment, so to actually keep a budget you run your own copy; see below)
 
 ## What it is for
 
@@ -75,7 +75,9 @@ the filesystem (`file://`) for quick local viewing.
 
 ## Running it
 
-- **Hosted:** open <https://deansie.github.io/familybudget/> and sign in with OneDrive to enable sync.
+- **Demo:** open <https://deansie.github.io/familybudget/> to explore the interface. Sign-in
+  is bound to this deployment's own Microsoft app registration, so the demo is for previewing,
+  not for keeping your own data — for that, deploy your own copy (below).
 - **Locally:** open `index.html` in a Chromium-based desktop browser. The interface works
   from `file://`, but OneDrive sign-in does not (it needs a real https origin), so local
   viewing is best for trying out the UI rather than editing synced data.
