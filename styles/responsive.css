@@ -1,0 +1,20 @@
+@media (max-width:920px){
+  .container{
+    grid-template-columns:1fr;
+    grid-template-rows:none;
+    grid-template-areas:"brand" "main" "od";
+  }
+  .brand-card{position:static;top:auto}
+  .brand{gap:16px}
+  .brand h1{font-size:clamp(1.9rem,9vw,2.7rem);line-height:1.05}
+  .logo{width:54px;height:54px;border-radius:14px;font-size:21px}
+}
+@media (max-width:560px){
+  body{padding:12px}
+  .top-cards{grid-template-columns:1fr}
+  .col-head{display:none}
+  .row{grid-template-columns:20px 1fr 96px 30px;gap:7px}
+  .container.locked .row{grid-template-columns:1fr 96px}
+  .item-bar{display:none}
+  .mchip{min-width:130px}
+}

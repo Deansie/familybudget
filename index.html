@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#e7eaf0" />
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0d121b" />
+<title>Familjebudget</title>
+
+<link rel="stylesheet" href="styles/base.css" />
+<link rel="stylesheet" href="styles/layout.css" />
+<link rel="stylesheet" href="styles/components.css" />
+<link rel="stylesheet" href="styles/overlays.css" />
+<link rel="stylesheet" href="styles/modes.css" />
+<link rel="stylesheet" href="styles/responsive.css" />
+</head>
+
+<body>
+<div id="app" class="container" role="application" aria-label="Familjebudget">
+
+  <!-- Brand header -->
+  <header class="side-card brand-card">
+    <div class="brand">
+      <div class="logo" aria-hidden="true">FB</div>
+      <h1>Familjebudget</h1>
+    </div>
+  </header>
+
+  <!-- Main -->
+  <main class="main" role="main">
+    <nav class="month-nav" aria-label="Välj månad">
+      <div class="month-rail" id="monthRail"></div>
+    </nav>
+
+    <div class="page-head">
+      <div>
+        <h2 id="monthTitle">—</h2>
+        <div class="sub" id="monthSub"></div>
+      </div>
+      <button class="btn ghost sm" id="editToggle" type="button">✎ Redigera</button>
+    </div>
+
+    <section class="top-cards" aria-label="Summering">
+      <div class="card">
+        <h3>Intäkter</h3>
+        <div class="value" id="incomeTotal">0 kr</div>
+      </div>
+      <div class="card">
+        <h3>Utgifter</h3>
+        <div class="value" id="expenseTotal">0 kr</div>
+      </div>
+      <div class="card accent">
+        <span class="pill" id="savingsPill">—</span>
+        <h3>Kvar</h3>
+        <div class="value" id="balanceTotal">0 kr</div>
+      </div>
+    </section>
+
+    <section class="flowbar" aria-label="Intäkter mot utgifter">
+      <div class="fb-head">
+        <span>Använt av intäkterna: <b id="fbSpent">0 kr</b></span>
+        <span id="fbPct">0%</span>
+      </div>
+      <div class="track"><div class="fill" id="fbFill" style="width:0%"></div></div>
+      <div class="fb-foot">
+        <span>Intäkter <b id="fbIncome">0 kr</b></span>
+        <span id="fbLeftLabel">Kvar 0 kr</span>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="incomeHeading">
+      <div class="section-header">
+        <h2 id="incomeHeading">Intäkter</h2>
+        <span class="total" id="incomeHeadTotal">0 kr</span>
+      </div>
+      <div class="col-head"><span></span><span>Namn</span><span class="ch-amt">Belopp</span><span class="ch-del"></span></div>
+      <div class="rows" id="incomeRows"></div>
+      <div class="add-row"><button class="btn ghost sm" id="addIncomeBtn" type="button">+ Lägg till intäkt</button><button class="btn ghost sm" id="addIncomeGroupBtn" type="button">+ Lägg till grupp</button></div>
+    </section>
+
+    <section class="section" aria-labelledby="expenseHeading">
+      <div class="section-header">
+        <h2 id="expenseHeading">Utgifter</h2>
+        <span class="total" id="expenseHeadTotal">0 kr</span>
+      </div>
+      <div class="col-head"><span></span><span>Namn</span><span class="ch-amt">Belopp</span><span class="ch-del"></span></div>
+      <div class="rows" id="expenseRows"></div>
+      <div class="add-row"><button class="btn ghost sm" id="addExpenseBtn" type="button">+ Lägg till utgift</button><button class="btn ghost sm" id="addExpenseGroupBtn" type="button">+ Lägg till grupp</button></div>
+    </section>
+  </main>
+
+  <!-- OneDrive panel (its own card, sits at the bottom on mobile) -->
+  <aside class="side-card od-card">
+    <div class="side-label"><span>OneDrive</span></div>
+    <div class="storage">
+      <div class="st-row"><span class="dot" id="odDot"></span><span class="st-name" id="odName">Inte inloggad</span></div>
+      <div id="odHint" style="font-size:.76rem">Logga in för automatisk synk på alla enheter.</div>
+      <button class="btn ghost sm block" id="onedriveBtn" type="button">☁ Logga in med OneDrive</button>
+    </div>
+  </aside>
+</div>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<!-- New month dialog -->
+<dialog id="monthDialog">
+  <form method="dialog" class="dlg-body" id="monthForm">
+    <h3>Ny månad</h3>
+    <p>Välj vilken månad du vill lägga till.</p>
+    <div class="dlg-field">
+      <label for="monthInput">Månad</label>
+      <input type="month" id="monthInput" required />
+    </div>
+    <label class="dlg-check"><input type="checkbox" id="copyCheck" checked /> Kopiera poster från nuvarande månad</label>
+    <div class="dlg-actions">
+      <button class="btn ghost" value="cancel" type="submit">Avbryt</button>
+      <button class="btn" value="ok" id="monthOk" type="submit">Skapa</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Confirm dialog -->
+<dialog id="confirmDialog">
+  <form method="dialog" class="dlg-body">
+    <h3 id="confirmTitle">Bekräfta</h3>
+    <p id="confirmText"></p>
+    <div class="dlg-actions">
+      <button class="btn ghost" value="cancel" type="submit">Avbryt</button>
+      <button class="btn" value="ok" id="confirmOk" type="submit" style="background:var(--danger)">Ta bort</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.27.0/lib/msal-browser.min.js"></script>
+<script src="scripts/helpers.js"></script>
+<script src="scripts/state.js"></script>
+<script src="scripts/render.js"></script>
+<script src="scripts/actions.js"></script>
+<script src="scripts/sync.js"></script>
+<script src="scripts/toast.js"></script>
+<script src="scripts/main.js"></script>
+</body>
+</html>

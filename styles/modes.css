@@ -1,0 +1,14 @@
+#editToggle{
+  flex:none;align-self:center;white-space:nowrap;
+  &.on{background:var(--accent);color:var(--on-accent);border-color:transparent}
+}
+.container.locked{
+  & .drag-handle,
+  & .row-del,
+  & .add-row,
+  & .add-sub,
+  & .mchip.add,
+  & .mc-del{display:none}
+  & .row{grid-template-columns:1fr 132px}
+  & .inp{pointer-events:none;background:transparent;border-color:transparent;cursor:default}
+}
